@@ -1,0 +1,69 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Apply gpu passthrough configurations on host
+  gather_facts: false
+  vars:
+    source_dir: "/usr/share/maine-ansible/config"
+  hosts:
+    - compute
+    - deployment
+  tasks:
+    - name: check whether iommu config existed
+      command: "grep -iRn 'intel_iommu=on' /etc/default/grub"
+      failed_when: existed_iommu_config.rc > 1
+      register: existed_iommu_config
+      when:
+        - inventory_hostname in groups['compute']
+
+    - block:
+        - name: find gpu ids
+          shell: |
+            lspci -Dnn | grep NVIDIA | grep -v Audio | awk '{print $(NF-2)}' | uniq | cut -b 2- | sed s'/.$//'
+          register: gpu_ids_result
+
+        - set_fact:
+            gpu_ids: "{{ gpu_ids_result.stdout_lines }}"
+
+        - name: generate vfio config file
+          template:
+            src: "{{ source_dir }}/features/gpu_nodes/vfio.conf.j2"
+            dest: "/etc/modprobe.d/vfio.conf"
+      become: True
+      when:
+        - inventory_hostname in groups['compute']
+
+    - block:
+        - name: update iommu config in grup
+          command: "sed -i 's/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"intel_iommu=on /' /etc/default/grub"
+
+        - name: grub2-mkconfig
+          command: "grub2-mkconfig -o /etc/grub2.cfg"
+
+        - name: Reboot immediately if there was a change.
+          shell: "sleep 5 && reboot"
+          async: 1
+          poll: 0
+
+        - name: Wait for the reboot to complete if there was a change
+          wait_for_connection:
+            connect_timeout: 20
+            sleep: 5
+            delay: 5
+            timeout: 300
+      when:
+        - inventory_hostname in groups['compute']
+        - existed_iommu_config.rc == 1
+      become: True
+
+# This is unstable now, and different environment has its owner configurations
+# - name: merge nova.conf
+#   merge_configs:
+#     sources:
+#       - "{{ source_dir }}/features/gpu_nodes/nova.conf.j2"
+#       - "{{ node_custom_config }}/nova.conf"
+#     dest: "{{ node_custom_config }}/nova.conf"
+#     mode: "0660"
+#   become: True
+#   when:
+#     - inventory_hostname in groups['deployment']

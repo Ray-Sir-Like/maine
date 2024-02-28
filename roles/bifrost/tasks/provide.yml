@@ -1,0 +1,12 @@
+---
+- name: Copy provide script
+  copy:
+    src: provide.py
+    dest: "{{ node_config_directory }}/bifrost/provide.py"
+    mode: "0755"
+  become: true
+
+- name: Do provide
+  command: >
+    docker exec bifrost_deploy
+    python /etc/bifrost/provide.py

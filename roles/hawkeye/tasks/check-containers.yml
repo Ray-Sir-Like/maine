@@ -1,0 +1,63 @@
+---
+- name: Check hawkeye containers
+  become: true
+  kolla_docker:
+    action: "compare_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ item.value.container_name }}"
+    image: "{{ item.value.image }}"
+    volumes: "{{ item.value.volumes|reject('equalto', '')|list }}"
+    dimensions: "{{ item.value.dimensions }}"
+    healthcheck: "{{ item.value.healthcheck | default(omit) }}"
+    privileged: "{{ item.value.privileged | default(False) }}"
+    ipc_mode: "{{ item.value.ipc_mode | default('') }}"
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ hawkeye_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+# Deprecated old system packages
+- name: Ensure container_exporter and node_exporter absent
+  become: true
+  package:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - container_exporter
+    - node_exporter
+
+# Deprecated old container
+- name: Ensure deprecated containers absent
+  become: true
+  kolla_docker:
+    name: "{{ item }}"
+    action: remove_container
+  loop: "{{ deprecated_hawkeye_services }}"
+
+- name: Ensure deprecated container volumes absent
+  become: true
+  vars:
+    deprecated_hawkeye_volumes:
+      - consul
+      - alertmanager
+  kolla_docker:
+    name: "{{ item }}"
+    action: remove_volume
+  loop: "{{ deprecated_hawkeye_volumes }}"
+
+# https://github.com/google/cadvisor/issues/1444
+# FIXME: naming is reversed (cpu,cpuacct vs cpuacct,cpu)
+- name: Hack fix for cadvisor
+  command: >
+    bash -c "mount -o remount,rw '/sys/fs/cgroup' &&
+    ln -rs /sys/fs/cgroup/cpu,cpuacct /sys/fs/cgroup/cpuacct,cpu &&
+    ln -rs /sys/fs/cgroup/net_cls,net_prio /sys/fs/cgroup/net_prio,net_cls &&
+    mount -o remount,ro '/sys/fs/cgroup'"
+  when:
+    - ansible_os_family == 'RedHat'
+    - enable_hawkeye_cadvisor | bool
+
+- name: Flush handlers
+  meta: flush_handlers

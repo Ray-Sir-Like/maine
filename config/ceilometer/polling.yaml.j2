@@ -1,0 +1,69 @@
+---
+sources:
+  - name: instance_pollsters
+    interval: 30
+    discovery:
+      - uos_local_instances
+    meters:
+      - cpu
+      - cpu.rate
+      - network.incoming.bytes
+      - network.incoming.bytes.rate
+      - network.incoming.packets
+      - network.incoming.packets.rate
+      - network.outgoing.bytes
+      - network.outgoing.bytes.rate
+      - network.outgoing.packets
+      - network.outgoing.packets.rate
+      - disk.device.read.bytes
+      - disk.device.read.bytes.rate
+      - disk.device.read.requests
+      - disk.device.read.requests.rate
+      - disk.device.write.bytes
+      - disk.device.write.bytes.rate
+      - disk.device.write.requests
+      - disk.device.write.requests.rate
+      - uos.cpu.time
+      - uos.memory.used
+      - uos.memory.usage
+      - uos.memory.total
+      - uos.memory.available
+  - name: service_pollsters
+    interval: 300
+    meters:
+{% if enable_glance | bool %}
+      - image.size
+{% endif %}
+{% if enable_s3 | bool %}
+      - ustack_radosgw.objects
+      - ustack_radosgw.objects.size
+      - ustack_radosgw.objects.containers
+      - ustack_radosgw.usage
+{% endif %}
+{% if enable_neutron_uplugin_agent | bool %}
+      - network.floatingip.bandwidth
+      - network.router.bandwidth
+{% endif %}
+{% if enable_neutron_vpnaas | bool %}
+      - network.services.vpn
+      - network.services.vpn.connections
+{% endif %}
+{% if enable_octavia | bool %}
+      - octavia.lb.active.connections
+      - octavia.lb.incoming.bytes
+      - octavia.lb.loadbalancer
+      - octavia.lb.outgoing.bytes
+      - octavia.lb.total.connections
+{% endif %}
+{% if enable_manila | bool %}
+      - ustack_manila.share.size
+      - ustack_manila.share.snapshot.size
+{% endif %}
+{% if enable_neutron_fwaas | bool %}
+      - ustack_network.services.firewall.group
+{% endif %}
+{% if enable_cinder | bool %}
+      - ustack_volume.snapshot.size
+      - volume.size
+      - volume.backup.size
+{% endif %}

@@ -1,0 +1,4 @@
+[mysqld]
+wsrep_sst_method = mariabackup
+innodb_lock_schedule_algorithm = FCFS
+innodb_buffer_pool_size = "{{ dynamic_pool_size_mb }}M"

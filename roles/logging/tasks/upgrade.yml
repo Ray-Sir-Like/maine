@@ -1,0 +1,105 @@
+---
+# NOTE: The following tasks assume that the same hosts are used for
+# OpenSearch as were for ElasticSearch / Kibana, and that the
+# OpenSearch endpoint remains the same as ElasticSearch.
+
+- name: Disable shard allocation
+  become: true
+  vars:
+    opensearch_shard_body: {"transient": {"cluster.routing.allocation.enable": "none"}}
+  kolla_toolbox:
+    module_name: uri
+    module_args:
+      url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ logging_opensearch_port }}/_cluster/settings"
+      method: PUT
+      status_code: 200
+      return_content: yes
+      body: "{{ opensearch_shard_body | to_json }}"
+      body_format: json
+      validate_certs: no
+  delegate_to: "{{ groups['logging_opensearch'][0] }}"
+  run_once: true
+
+- name: Perform a synced flush
+  become: true
+  kolla_toolbox:
+    module_name: uri
+    module_args:
+      url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ logging_opensearch_port }}/_flush"
+      method: POST
+      status_code: 200
+      return_content: yes
+      body_format: json
+      validate_certs: no
+      timeout: 180
+  delegate_to: "{{ groups['logging_opensearch'][0] }}"
+  run_once: true
+  retries: "{{ logging_opensearch_upgrade_synced_retries }}"
+  delay: "{{ logging_opensearch_upgrade_synced_delay }}"
+  register: result
+  until: ('status' in result) and result.status == 200
+
+- name: Stop and remove ElasticSearch
+  become: true
+  kolla_docker:
+    action: "stop_and_remove_container"
+    name: "elasticsearch"
+  when:
+    - inventory_hostname in groups['logging_opensearch']
+
+- name: Stop and remove ElasticSearch Curator
+  become: true
+  kolla_docker:
+    action: "stop_and_remove_container"
+    name: "elasticsearch_curator"
+  when:
+    - inventory_hostname in groups['logging_opensearch_curator']
+
+- name: Stop and remove Kibana
+  become: true
+  kolla_docker:
+    action: "stop_and_remove_container"
+    name: "kibana"
+  when:
+    - inventory_hostname in groups['logging_opensearch_dashboards']
+
+- name: Delete ElasticSearch load-balancer config
+  file:
+    path: "{{ node_config_directory }}/haproxy/services.d/elasticsearch.cfg"
+    state: "absent"
+  become: true
+  when:
+    - inventory_hostname in groups['haproxy']
+
+- name: Delete Kibana load-balancer config
+  file:
+    path: "{{ node_config_directory }}/haproxy/services.d/kibana.cfg"
+    state: "absent"
+  become: true
+  when:
+    - inventory_hostname in groups['haproxy']
+
+# TODO: Use the volume name from defaults.yml
+- name: Create OpenSearch Docker volume
+  become: true
+  command: "docker volume create opensearch"
+
+- name: Check Elasticsearch Volume Existed
+  stat:
+    path: /var/lib/docker/volumes/elasticsearch/_data/nodes
+  register: elasticsearch_volume
+
+- name: Migrate ElasticSearch data to OpenSearch
+  become: true
+  command: "mv /var/lib/docker/volumes/elasticsearch/_data/nodes /var/lib/docker/volumes/opensearch/_data/"
+  when: elasticsearch_volume.stat.exists
+
+
+- import_tasks: config-host.yml
+
+- import_tasks: config.yml
+
+- import_tasks: check-containers.yml
+
+- name: Flush handlers
+  meta: flush_handlers

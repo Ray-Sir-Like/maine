@@ -1,0 +1,91 @@
+---
+project_name: "lulu"
+
+lulu_services:
+  lulu:
+    container_name: lulu
+    group: lulu
+    enabled: true
+    privileged: True
+    image: "{{ lulu_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/lulu/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ lulu_dimensions }}"
+    healthcheck: "{{ lulu_healthcheck }}"
+    haproxy:
+      lulu:
+        enabled: "{{ enable_lulu }}"
+        mode: "http"
+        external: false
+        port: "{{ lulu_port }}"
+        listen_port: "{{ lulu_listen_port }}"
+      lulu_external:
+        enabled: "{{ enable_lulu }}"
+        mode: "http"
+        external: true
+        port: "{{ lulu_port }}"
+        listen_port: "{{ lulu_listen_port }}"
+
+####################
+# Docker
+####################
+lulu_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/lulu"
+lulu_tag: "{{ openstack_tag }}"
+lulu_image_full: "{{ lulu_image }}:{{ lulu_tag }}"
+lulu_dimensions: "{{ default_container_dimensions }}"
+
+lulu_enable_healthchecks: "{{ enable_container_healthchecks }}"
+lulu_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+lulu_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+lulu_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+lulu_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ lulu_port }} "]
+lulu_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+lulu_healthcheck:
+  interval: "{{ lulu_healthcheck_interval }}"
+  retries: "{{ lulu_healthcheck_retries }}"
+  start_period: "{{ lulu_healthcheck_start_period }}"
+  test: "{% if lulu_enable_healthchecks | bool %}{{ lulu_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ lulu_healthcheck_timeout }}"
+
+lulu_firewall_zone: "{{ firewall_zone }}"
+
+####################
+# OpenStack
+####################
+lulu_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ lulu_port }}"
+lulu_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ lulu_port }}"
+lulu_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ lulu_port }}"
+
+openstack_lulu_auth: "{{ openstack_auth }}"
+
+lulu_keystone_user: "lulu"
+
+# valid options are ['internal', 'public']
+lulu_keystone_endpoint_type: "public"
+lulu_keystone_url: "{% if lulu_keystone_endpoint_type == 'internal' %}{{ keystone_internal_url }}{% else %}{{ keystone_public_url }}{% endif %}"
+
+####################
+# lulu
+####################
+lulu_log_dir: "/var/log/kolla/lulu"
+lulu_redis_db_number: 4
+
+####################
+# Keystone
+####################
+lulu_ks_services:
+  - name: "lulu"
+    type: "lulu"
+    description: "Unitedstack lulu"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ lulu_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ lulu_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ lulu_public_endpoint }}'}
+
+lulu_ks_users:
+  - project: "service"
+    user: "{{ lulu_keystone_user }}"
+    password: "{{ lulu_keystone_password }}"
+    role: "admin"

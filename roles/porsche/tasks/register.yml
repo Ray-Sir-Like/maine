@@ -1,0 +1,7 @@
+---
+- import_role:
+    name: service-ks-register
+  vars:
+    service_ks_register_auth: "{{ openstack_porsche_auth }}"
+    service_ks_register_services: "{{ porsche_ks_services }}"
+    service_ks_register_users: "{{ porsche_ks_users }}"

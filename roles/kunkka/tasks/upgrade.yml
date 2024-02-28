@@ -1,0 +1,31 @@
+---
+- import_tasks: config.yml
+
+# NOTE(Xing Zhang): Fix kunkka project change to service
+- include_tasks: register.yml
+  when: inventory_hostname in groups['kunkka']
+
+- import_tasks: check-containers.yml
+
+- name: Running Kunkka bootstrap container during upgrading
+  vars:
+    kunkka: "{{ kunkka_services['kunkka'] }}"
+  become: true
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    detach: False
+    environment:
+      KOLLA_UPGRADE:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    image: "{{ kunkka.image }}"
+    labels:
+      BOOTSTRAP:
+    name: "bootstrap_kunkka"
+    restart_policy: "no"
+    volumes: "{{ kunkka.volumes|reject('equalto', '')|list }}"
+  run_once: True
+  delegate_to: "{{ groups[kunkka.group][0] }}"
+
+- name: Flush handlers
+  meta: flush_handlers

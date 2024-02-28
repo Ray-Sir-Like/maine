@@ -1,0 +1,224 @@
+---
+metrics:
+  cpu:
+    unit: instance
+    alt_name: instance
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - display_name
+    metadata:
+      - flavor_name
+      - flavor_id
+      - vcpus
+    mutate: NUMBOOL
+    extra_args:
+      aggregation_method: max
+    replace_method:
+      name: display_name
+
+  image_size:
+    unit: GiB
+    factor: 1/1073741824
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - container_format
+      - disk_format
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  octavia_lb_loadbalancer:
+    unit: loadbalancer
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    mutate: NUMBOOL
+    extra_args:
+      aggregation_method: max
+
+  manila_share_size:
+    unit: GiB
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - share_type
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  manila_share_snapshot_size:
+    unit: GiB
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - share_type
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  network_services_firewall_group:
+    unit: firewall
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    mutate: NUMBOOL
+    extra_args:
+      aggregation_method: max
+
+  network_services_vpn:
+    unit: vpn
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    mutate: NUMBOOL
+    extra_args:
+      aggregation_method: max
+
+  radosgw_objects_size:
+    unit: GiB
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    factor: 1/1073741824
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  network_floatingip_bandwidth:
+    unit: MiB
+    factor: 1/1024
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - network_id
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  network_router_bandwidth:
+    unit: MiB
+    factor: 1/1024
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - network_id
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  volume_size:
+    unit: GiB
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - volume_type
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  volume_snapshot_size:
+    unit: GiB
+    groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+      - resource_id
+{% else %}
+      - id
+{% endif %}
+      - user_id
+      - project_id
+      - name
+    metadata:
+      - volume_type
+    mutate: CEIL
+    extra_args:
+      aggregation_method: max
+
+  swallow_objects_out_size:
+     unit: MiB
+     groupby:
+{% if enable_cloudkitty_prometheus_collector | bool %}
+       - resource_id
+{% else %}
+       - id
+{% endif %}
+       - user_id
+       - project_id
+       - name
+     factor: 1/1048576
+     mutate: CEIL
+     extra_args:
+       aggregation_method: max
+       range_function: delta

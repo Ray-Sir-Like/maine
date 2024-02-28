@@ -1,0 +1,68 @@
+---
+- name: Check if x86 ipa images existed
+  shell: if [[ -f "{{ ironic_image_folder }}/{{ ipa_default_kernel_name }}" && -f "{{ ironic_image_folder }}/{{ ipa_default_initramfs_name }}" ]];then echo "true";else echo "false";fi
+  register: ipa_files_existed
+
+- name: Set x86 ipa images name
+  set_fact:
+    ipa_kernel_name: "{{ ipa_default_kernel_name }}"
+    ipa_initramfs_name: "{{ ipa_default_initramfs_name }}"
+  when:
+    - ipa_files_existed.stdout_lines[0] | bool
+
+- name: Check if aarch64 ipa images existed
+  shell: if [[ -f "{{ ironic_image_folder }}/{{ ipa_aarch64_default_kernel_name }}" && -f "{{ ironic_image_folder }}/{{ ipa_aarch64_default_initramfs_name }}" ]];then echo "true";else echo "false";fi
+  register: ipa_aarch64_files_existed
+
+- name: Set aarch64 ipa images name
+  set_fact:
+    ipa_aarch64_kernel_name: "{{ ipa_aarch64_default_kernel_name }}"
+    ipa_aarch64_initramfs_name: "{{ ipa_aarch64_default_initramfs_name }}"
+  when:
+    - ipa_aarch64_files_existed.stdout_lines[0] | bool
+
+- name: Check if x86 baremetal image existed
+  shell: if [[ -f "{{ ironic_image_folder}}/{{ ironic_default_user_image_name }}" ]];then echo "true";else echo "false";fi
+  register: baremetal_image_existed
+
+- name: Set x86 baremetal image name
+  set_fact:
+    ironic_user_image_name: "{{ ironic_default_user_image_name }}"
+  when:
+    - baremetal_image_existed.stdout_lines[0] | bool
+
+- name: Check if aarch64 baremetal image existed
+  shell: if [[ -f "{{ ironic_image_folder}}/{{ ironic_aarch64_default_user_image_name }}" ]];then echo "true";else echo "false";fi
+  register: aarch64_baremetal_image_existed
+
+- name: Set aarch64 baremetal image name
+  set_fact:
+    ironic_aarch64_user_image_name: "{{ ironic_aarch64_default_user_image_name }}"
+  when:
+    - aarch64_baremetal_image_existed.stdout_lines[0] | bool
+
+- name: Get if x86 baremetal image md5sum
+  shell: cat {{ ironic_image_folder }}/{{ ironic_default_user_image_name }}.md5sum | awk '{print $1}'
+  register: baremetal_image_md5sum
+  when:
+    - baremetal_image_existed.stdout_lines[0] | bool
+
+- name: Get if aarch64 baremetal image md5sum
+  shell: cat {{ ironic_image_folder }}/{{ ironic_aarch64_default_user_image_name }}.md5sum | awk '{print $1}'
+  register: aarch64_baremetal_image_md5sum
+  when:
+    - aarch64_baremetal_image_existed.stdout_lines[0] | bool
+
+- name: Set x86 baremetal image md5sum
+  set_fact:
+    ironic_user_image_checksum: "{{ baremetal_image_md5sum.stdout_lines[0] }}"
+  when:
+    - baremetal_image_existed.stdout_lines[0] | bool
+
+- name: Set aarch64 baremetal image md5sum
+  set_fact:
+    ironic_aarch64_user_image_checksum: "{{ aarch64_baremetal_image_md5sum.stdout_lines[0] }}"
+  when:
+    - aarch64_baremetal_image_existed.stdout_lines[0] | bool
+
+- include_tasks: "{{ kolla_action }}.yml"

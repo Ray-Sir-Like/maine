@@ -1,0 +1,57 @@
+---
+- name: create s3 service and users
+  import_role:
+    name: service-ks-register
+  vars:
+    project_name: ceph
+    service_ks_register_auth: "{{ openstack_auth }}"
+    service_ks_register_services: "{{ ceph_ks_services }}"
+    service_ks_register_users: "{{ ceph_ks_users }}"
+    ceph_ks_services:
+      - name: "s3"
+        type: "s3-object-store"
+        description: "S3 Object Store"
+        endpoints:
+          - {'interface': 'admin', 'url': '{{ s3_admin_endpoint }}'}
+          - {'interface': 'internal', 'url': '{{ s3_internal_endpoint }}'}
+          - {'interface': 'public', 'url': '{{ s3_public_endpoint }}'}
+    ceph_ks_users:
+      - project: "service"
+        user: "{{ ceph_rgw_keystone_user }}"
+        password: "{{ ceph_rgw_keystone_password }}"
+        role: "admin"
+  when: enable_s3 | bool
+  tags:
+    - ceph
+
+- name: create Swift service and users
+  import_role:
+    name: service-ks-register
+  vars:
+    project_name: swift
+    service_ks_register_auth: "{{ openstack_auth }}"
+    service_ks_register_services: "{{ swift_ks_services }}"
+    service_ks_register_users: "{{ swift_ks_users }}"
+    swift_ks_services:
+      - name: "swift"
+        type: "object-store"
+        description: "Object Store"
+        endpoints:
+          - {'interface': 'admin', 'url': '{{ swift_admin_endpoint }}'}
+          - {'interface': 'internal', 'url': '{{ swift_internal_endpoint }}'}
+          - {'interface': 'public', 'url': '{{ swift_public_endpoint }}'}
+    swift_ks_users:
+      - project: "service"
+        user: "{{ ceph_rgw_keystone_user }}"
+        password: "{{ ceph_rgw_keystone_password }}"
+        role: "admin"
+  when: enable_swift | bool
+  tags:
+    - ceph
+
+- name: "Ensure {{ ceph_rgw_keystone_user }} user security compliance"
+  import_tasks: user_security_compliance.yml
+  vars:
+    username: "{{ ceph_rgw_keystone_user }}"
+  tags:
+    - ceph

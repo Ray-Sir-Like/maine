@@ -1,0 +1,174 @@
+---
+- name: Get container facts
+  become: true
+  kolla_container_facts:
+    name:
+      - hawkeye_consul
+      - hawkeye_prometheus
+      - hawkeye_alertmanager
+      - hawkeye_grafana
+      - hawkeye_blackbox_exporter
+      - hawkeye_haproxy_exporter
+      - hawkeye_memcached_exporter
+      - hawkeye_mysqld_exporter
+      - hawkeye_redis_exporter
+      - hawkeye_cadvisor
+      - hawkeye_node_exporter
+      - hawkeye_docker_state_exporter
+      - hawkeye_smartctl_exporter
+      - hawkeye_keepalived_exporter
+  register: container_facts
+
+- name: Checking free port for hawkeye_consul
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_consul_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_consul'] is not defined
+    - inventory_hostname in groups['hawkeye_consul']
+
+- name: Checking free port for hawkeye_prometheus
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_prometheus_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_prometheus'] is not defined
+    - inventory_hostname in groups['hawkeye_prometheus']
+
+- name: Checking free port for hawkeye_alertmanager
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_alertmanager_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_alertmanager'] is not defined
+    - inventory_hostname in groups['hawkeye_alertmanager']
+
+- name: Checking free port for hawkeye_grafana
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_grafana_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_grafana'] is not defined
+    - inventory_hostname in groups['hawkeye_grafana']
+
+- name: Checking free port for hawkeye_blackbox_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_blackbox_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_blackbox_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_blackbox_exporter']
+
+- name: Checking free port for hawkeye_haproxy_exporter_port
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_haproxy_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_haproxy_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_haproxy_exporter']
+
+- name: Checking free port for hawkeye_memcached_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_memcached_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_memcached_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_memcached_exporter']
+
+- name: Checking free port for hawkeye_mysqld_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_mysqld_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_mysqld_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_mysqld_exporter']
+
+- name: Checking free port for hawkeye_redis_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_redis_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_redis_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_redis_exporter']
+
+- name: Checking free port for hawkeye_cadvisor
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_cadvisor_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_cadvisor'] is not defined
+    - inventory_hostname in groups['hawkeye_cadvisor']
+
+- name: Checking free port for hawkeye_node_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_node_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_node_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_node_exporter']
+
+- name: Checking free port for hawkeye_docker_state_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_docker_state_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_docker_state_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_docker_state_exporter']
+
+- name: Checking free port for hawkeye_smartctl_exporter
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_smartctl_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_smartctl_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_smartctl_exporter']
+
+- name: Checking free port for hawkeye_keepalived_exporter_port
+  wait_for:
+    host: "{{ monitoring_interface_address }}"
+    port: "{{ hawkeye_keepalived_exporter_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['hawkeye_keepalived_exporter'] is not defined
+    - inventory_hostname in groups['hawkeye_keepalived_exporter']

@@ -1,0 +1,509 @@
+---
+project_name: "hawkeye"
+
+# Note(Yao Ning): In order to unify naming conversion, we should deprecated container with old name
+deprecated_hawkeye_services:
+  - consul
+  - prometheus
+  - alertmanager
+  - grafana
+  - haproxy_exporter
+  - memcached_exporter
+  - mysqld_exporter
+  - blackbox_exporter
+  - openstack_exporter
+  - openstack-exporter
+  - redis_exporter
+  - cadvisor
+  - node_exporter
+  - nvidia_gpu_prometheus_exporter
+  - docker_state_exporter
+
+hawkeye_services:
+  hawkeye-consul:
+    container_name: hawkeye_consul
+    group: hawkeye_consul
+    enabled: "{{ enable_hawkeye_consul | bool }}"
+    image: "{{ consul_image_full }}"
+    volumes: "{{ consul_default_volumes + consul_extra_volumes }}"
+    dimensions: "{{ consul_dimensions }}"
+    haproxy:
+      hawkeye_consul:
+        enabled: "{{ enable_hawkeye_consul }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_consul_port }}"
+      hawkeye_consul_external:
+        enabled: "{{ enable_hawkeye_consul }}"
+        mode: "http"
+        external: true
+        port: "{{ hawkeye_consul_port }}"
+  hawkeye-prometheus:
+    container_name: hawkeye_prometheus
+    group: hawkeye_prometheus
+    enabled: "{{ enable_hawkeye_prometheus | bool }}"
+    image: "{{ prometheus_image_full }}"
+    volumes: "{{ prometheus_default_volumes + prometheus_extra_volumes }}"
+    dimensions: "{{ prometheus_dimensions }}"
+    haproxy:
+      hawkeye_prometheus:
+        enabled: "{{ enable_hawkeye_prometheus }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_prometheus_port }}"
+      hawkeye_prometheus_external:
+        enabled: "{{ enable_hawkeye_prometheus }}"
+        mode: "http"
+        external: true
+        port: "{{ hawkeye_prometheus_port }}"
+        auth_user: "{{ prometheus_user }}"
+        auth_pass: "{{ prometheus_password }}"
+  hawkeye-alertmanager:
+    container_name: hawkeye_alertmanager
+    group: hawkeye_alertmanager
+    enabled: "{{ enable_hawkeye_alertmanager | bool }}"
+    image: "{{ alertmanager_image_full }}"
+    volumes: "{{ alertmanager_default_volumes + alertmanager_extra_volumes }}"
+    dimensions: "{{ alertmanager_dimensions }}"
+    haproxy:
+      hawkeye_alertmanager:
+        enabled: "{{ enable_hawkeye_alertmanager }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_alertmanager_port }}"
+      hawkeye_alertmanager_external:
+        enabled: "{{ enable_hawkeye_alertmanager }}"
+        mode: "http"
+        external: true
+        port: "{{ hawkeye_alertmanager_port }}"
+        auth_user: "{{ alertmanager_user }}"
+        auth_pass: "{{ alertmanager_password }}"
+  hawkeye-grafana:
+    container_name: hawkeye_grafana
+    group: hawkeye_grafana
+    enabled: "{{ enable_hawkeye_grafana | bool }}"
+    image: "{{ grafana_image_full }}"
+    volumes: "{{ grafana_default_volumes + grafana_extra_volumes }}"
+    dimensions: "{{ grafana_dimensions }}"
+    haproxy:
+      grafana_server:
+        enabled: "{{ enable_hawkeye_grafana | bool }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_grafana_port }}"
+      grafana_server_external:
+        enabled: "{{ enable_hawkeye_grafana | bool }}"
+        mode: "http"
+        external: true
+        port: "{{ hawkeye_grafana_port }}"
+  hawkeye-haproxy-exporter:
+    container_name: hawkeye_haproxy_exporter
+    group: hawkeye_haproxy_exporter
+    enabled: "{{ enable_hawkeye_haproxy_exporter | bool }}"
+    image: "{{ haproxy_exporter_image_full }}"
+    volumes: "{{ haproxy_exporter_default_volumes + haproxy_exporter_extra_volumes }}"
+    dimensions: "{{ haproxy_exporter_dimensions }}"
+  hawkeye-memcached-exporter:
+    container_name: hawkeye_memcached_exporter
+    group: hawkeye_memcached_exporter
+    enabled: "{{ enable_hawkeye_memcached_exporter | bool }}"
+    image: "{{ memcached_exporter_image_full }}"
+    volumes: "{{ memcached_exporter_default_volumes + memcached_exporter_extra_volumes }}"
+    dimensions: "{{ memcached_exporter_dimensions }}"
+  hawkeye-mysqld-exporter:
+    container_name: hawkeye_mysqld_exporter
+    group: hawkeye_mysqld_exporter
+    enabled: "{{ enable_hawkeye_mysqld_exporter | bool }}"
+    image: "{{ mysqld_exporter_image_full }}"
+    volumes: "{{ mysqld_exporter_default_volumes + mysqld_exporter_extra_volumes }}"
+    dimensions: "{{ mysqld_exporter_dimensions }}"
+  hawkeye-blackbox-exporter:
+    container_name: hawkeye_blackbox_exporter
+    group: hawkeye_blackbox_exporter
+    enabled: "{{ enable_hawkeye_blackbox_exporter | bool }}"
+    image: "{{ blackbox_exporter_image_full }}"
+    volumes: "{{ blackbox_exporter_default_volumes + blackbox_exporter_extra_volumes }}"
+    dimensions: "{{ blackbox_exporter_dimensions }}"
+    haproxy:
+      hawkeye_blackbox_exporter:
+        enabled: "{{ enable_hawkeye_blackbox_exporter }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_blackbox_exporter_port }}"
+  hawkeye-openstack-exporter:
+    container_name: hawkeye_openstack_exporter
+    group: hawkeye_openstack_exporter
+    enabled: "{{ enable_hawkeye_openstack_exporter | bool }}"
+    image: "{{ openstack_exporter_image_full }}"
+    volumes: "{{ openstack_exporter_default_volumes + openstack_exporter_extra_volumes }}"
+    dimensions: "{{ openstack_exporter_dimensions }}"
+    haproxy:
+      hawkeye_openstack_exporter:
+        enabled: "{{ enable_hawkeye_openstack_exporter }}"
+        mode: "http"
+        external: false
+        port: "{{ hawkeye_openstack_exporter_port }}"
+  hawkeye-redis-exporter:
+    container_name: hawkeye_redis_exporter
+    group: hawkeye_redis_exporter
+    enabled: "{{ enable_hawkeye_redis_exporter | bool }}"
+    image: "{{ redis_exporter_image_full }}"
+    volumes: "{{ redis_exporter_default_volumes + redis_exporter_extra_volumes }}"
+    dimensions: "{{ redis_exporter_dimensions }}"
+  hawkeye-cadvisor:
+    container_name: hawkeye_cadvisor
+    group: hawkeye_cadvisor
+    enabled: "{{ enable_hawkeye_cadvisor | bool }}"
+    image: "{{ cadvisor_image_full }}"
+    privileged: True
+    volumes: "{{ cadvisor_default_volumes + cadvisor_extra_volumes }}"
+    dimensions: "{{ cadvisor_dimensions }}"
+  hawkeye-node-exporter:
+    container_name: hawkeye_node_exporter
+    group: hawkeye_node_exporter
+    enabled: "{{ enable_hawkeye_node_exporter | bool }}"
+    image: "{{ node_exporter_image_full }}"
+    privileged: True
+    ipc_mode: "host"
+    volumes: "{{ node_exporter_default_volumes + node_exporter_extra_volumes }}"
+    dimensions: "{{ node_exporter_dimensions }}"
+  hawkeye-nvidia-gpu-prometheus-exporter:
+    container_name: hawkeye_nvidia_gpu_prometheus_exporter
+    group: hawkeye_nvidia_gpu_prometheus_exporter
+    enabled: "{{ enable_hawkeye_nvidia_gpu_prometheus_exporter | bool }}"
+    image: "{{ nvidia_gpu_prometheus_exporter_image_full }}"
+    pid_mode: "host"
+    privileged: True
+    volumes: "{{ nvidia_gpu_prometheus_exporter_default_volumes + nvidia_gpu_prometheus_exporter_extra_volumes }}"
+    dimensions: "{{ nvidia_gpu_prometheus_exporter_dimensions }}"
+  hawkeye-docker-state-exporter:
+    container_name: hawkeye_docker_state_exporter
+    group: hawkeye_docker_state_exporter
+    enabled: "{{ enable_hawkeye_docker_state_exporter | bool }}"
+    image: "{{ docker_state_exporter_image_full }}"
+    volumes: "{{ docker_state_exporter_default_volumes + docker_state_exporter_extra_volumes }}"
+    dimensions: "{{ docker_state_exporter_dimensions }}"
+  hawkeye-smartctl-exporter:
+    container_name: hawkeye_smartctl_exporter
+    group: hawkeye_smartctl_exporter
+    enabled: "{{ enable_hawkeye_smartctl_exporter | bool }}"
+    image: "{{ smartctl_exporter_image_full }}"
+    privileged: True
+    volumes: "{{ smartctl_exporter_default_volumes + smartctl_exporter_extra_volumes }}"
+    dimensions: "{{ smartctl_exporter_dimensions }}"
+  hawkeye-keepalived-exporter:
+    container_name: hawkeye_keepalived_exporter
+    group: hawkeye_keepalived_exporter
+    enabled: "{{ enable_hawkeye_keepalived_exporter | bool }}"
+    image: "{{ keepalived_exporter_image_full }}"
+    volumes: "{{ keepalived_exporter_default_volumes + keepalived_exporter_extra_volumes }}"
+    dimensions: "{{ keepalived_exporter_dimensions }}"
+
+####################
+# Database
+####################
+mysqld_exporter_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}hawkeye{% endif %}"
+
+grafana_database_name: "grafana"
+grafana_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}grafana{% endif %}"
+grafana_database_address: "{{ database_address }}:{{ database_port }}"
+grafana_purge_database: "{{ hawkeye_grafana_purge_database }}"
+
+####################
+# Docker
+####################
+consul_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-consul"
+consul_tag: "{{ openstack_tag }}"
+consul_image_full: "{{ consul_image }}:{{ consul_tag }}"
+
+prometheus_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-prometheus"
+prometheus_tag: "{{ openstack_tag }}"
+prometheus_image_full: "{{ prometheus_image }}:{{ prometheus_tag }}"
+
+alertmanager_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-alertmanager"
+alertmanager_tag: "{{ openstack_tag }}"
+alertmanager_image_full: "{{ alertmanager_image }}:{{ alertmanager_tag }}"
+
+grafana_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-grafana"
+grafana_tag: "{{ openstack_tag }}"
+grafana_image_full: "{{ grafana_image }}:{{ grafana_tag }}"
+
+blackbox_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-blackbox-exporter"
+blackbox_exporter_tag: "{{ openstack_tag }}"
+blackbox_exporter_image_full: "{{ blackbox_exporter_image }}:{{ blackbox_exporter_tag }}"
+
+haproxy_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-haproxy-exporter"
+haproxy_exporter_tag: "{{ openstack_tag }}"
+haproxy_exporter_image_full: "{{ haproxy_exporter_image }}:{{ haproxy_exporter_tag }}"
+
+memcached_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-memcached-exporter"
+memcached_exporter_tag: "{{ openstack_tag }}"
+memcached_exporter_image_full: "{{ memcached_exporter_image }}:{{ memcached_exporter_tag }}"
+
+mysqld_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-mysqld-exporter"
+mysqld_exporter_tag: "{{ openstack_tag }}"
+mysqld_exporter_image_full: "{{ mysqld_exporter_image }}:{{ mysqld_exporter_tag }}"
+
+openstack_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-openstack-exporter"
+openstack_exporter_tag: "{{ openstack_tag }}"
+openstack_exporter_image_full: "{{ openstack_exporter_image }}:{{ openstack_exporter_tag }}"
+
+redis_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-redis-exporter"
+redis_exporter_tag: "{{ openstack_tag }}"
+redis_exporter_image_full: "{{ redis_exporter_image }}:{{ redis_exporter_tag }}"
+
+cadvisor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-cadvisor"
+cadvisor_tag: "{{ openstack_tag }}"
+cadvisor_image_full: "{{ cadvisor_image }}:{{ cadvisor_tag }}"
+
+node_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-node-exporter"
+node_exporter_tag: "{{ openstack_tag }}"
+node_exporter_image_full: "{{ node_exporter_image }}:{{ node_exporter_tag }}"
+
+nvidia_gpu_prometheus_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-nvidia-gpu-prometheus-exporter"
+nvidia_gpu_prometheus_exporter_tag: "{{ openstack_tag }}"
+nvidia_gpu_prometheus_exporter_image_full: "{{ nvidia_gpu_prometheus_exporter_image }}:{{ nvidia_gpu_prometheus_exporter_tag }}"
+
+docker_state_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-docker-state-exporter"
+docker_state_exporter_tag: "{{ openstack_tag }}"
+docker_state_exporter_image_full: "{{ docker_state_exporter_image }}:{{ docker_state_exporter_tag }}"
+
+smartctl_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-smartctl-exporter"
+smartctl_exporter_tag: "{{ openstack_tag }}"
+smartctl_exporter_image_full: "{{ smartctl_exporter_image }}:{{ smartctl_exporter_tag }}"
+
+keepalived_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-keepalived-exporter"
+keepalived_exporter_tag: "{{ openstack_tag }}"
+keepalived_exporter_image_full: "{{ keepalived_exporter_image }}:{{ keepalived_exporter_tag }}"
+
+hawkeye_dimensions: "{{ default_container_dimensions }}"
+consul_dimensions: "{{ hawkeye_dimensions }}"
+prometheus_dimensions: "{{ hawkeye_dimensions }}"
+alertmanager_dimensions: "{{ hawkeye_dimensions }}"
+grafana_dimensions: "{{ default_container_dimensions }}"
+blackbox_exporter_dimensions: "{{ hawkeye_dimensions }}"
+haproxy_exporter_dimensions: "{{ hawkeye_dimensions }}"
+memcached_exporter_dimensions: "{{ hawkeye_dimensions }}"
+mysqld_exporter_dimensions: "{{ hawkeye_dimensions }}"
+openstack_exporter_dimensions: "{{ hawkeye_dimensions }}"
+redis_exporter_dimensions: "{{ hawkeye_dimensions }}"
+cadvisor_dimensions: "{{ hawkeye_dimensions }}"
+node_exporter_dimensions: "{{ hawkeye_dimensions }}"
+nvidia_gpu_prometheus_exporter_dimensions: "{{ hawkeye_dimensions }}"
+docker_state_exporter_dimensions: "{{ hawkeye_dimensions }}"
+smartctl_exporter_dimensions: "{{ hawkeye_dimensions }}"
+keepalived_exporter_dimensions: "{{ hawkeye_dimensions }}"
+
+consul_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-consul/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "hawkeye_consul:/consul/"
+  - "kolla_logs:/var/log/kolla/"
+prometheus_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-prometheus/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "hawkeye_prometheus:/prometheus/"
+  - "kolla_logs:/var/log/kolla/"
+alertmanager_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-alertmanager/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "hawkeye_alertmanager:/alertmanager/"
+  - "kolla_logs:/var/log/kolla/"
+grafana_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-grafana/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "hawkeye_grafana:/grafana/"
+  - "kolla_logs:/var/log/kolla/"
+blackbox_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-blackbox-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+haproxy_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-haproxy-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "haproxy_socket:/var/lib/kolla/haproxy"
+memcached_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-memcached-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+mysqld_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-mysqld-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+openstack_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-openstack-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+redis_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-redis-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+cadvisor_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-cadvisor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "/:/rootfs:ro"
+  - "/var/run:/var/run:rw"
+  - "/sys:/sys:ro"
+  - "/var/lib/docker/:/var/lib/docker:ro"
+  - "/dev/disk/:/dev/disk:ro"
+node_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-node-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "/:/host:ro,rslave"
+  - "/proc:/host/proc:ro"
+  - "/sys:/host/sys:ro"
+  - "/run/systemd:/run/systemd:ro"
+nvidia_gpu_prometheus_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-nvidia-gpu-prometheus-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+docker_state_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-docker-state-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "/var/run:/var/run:rw"
+  - "kolla_logs:/var/log/kolla/"
+smartctl_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-smartctl-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+keepalived_exporter_default_volumes:
+  - "{{ node_config_directory }}/hawkeye/hawkeye-keepalived-exporter/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "keepalived_data:/tmp/keepalived-tmp/:ro"
+  - "/var/run/docker.sock:/var/run/docker.sock"
+
+hawkeye_extra_volumes: "{{ default_extra_volumes }}"
+consul_extra_volumes: "{{ hawkeye_extra_volumes }}"
+prometheus_extra_volumes: "{{ hawkeye_extra_volumes }}"
+alertmanager_extra_volumes: "{{ hawkeye_extra_volumes }}"
+grafana_extra_volumes: "{{ hawkeye_extra_volumes }}"
+blackbox_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+haproxy_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+memcached_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+mysqld_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+openstack_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+redis_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+cadvisor_extra_volumes: "{{ hawkeye_extra_volumes }}"
+node_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+nvidia_gpu_prometheus_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+docker_state_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+smartctl_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+keepalived_exporter_extra_volumes: "{{ hawkeye_extra_volumes }}"
+
+####################
+# Prometheus options
+####################
+prometheus_data_retention_day: 90
+prometheus_scrape_interval: "15s"
+prometheus_scrape_timeout: "15s"
+prometheus_evaluation_interval: "15s"
+
+####################
+# Alerting options
+####################
+enable_hawkeye_alertmanager_email: False
+enable_hawkeye_alertmanager_wechat: False
+wechat_to_party:
+  - 1
+  - 2
+wechat_agent_id: 1000002
+wechat_corp_id: "ww8f882e00e123456d"
+wechat_api_url: "https://qyapi.weixin.qq.com/cgi-bin/"
+wechat_api_secret: "WZyaR0t2dKWQ5I9qf8w3DwyXSXZRrylTLlTTL97gr7y"
+
+####################
+# Grafana options
+####################
+grafana_auth_anonymous_enabled: "yes"
+grafana_default_theme: "light"
+grafana_admin_username: "admin"
+grafana_allow_embedding: True
+
+####################
+# Consul options
+####################
+consul_leave_on_terminate: "false"
+
+####################
+## Blackbox options
+#####################
+blackbox_payload_size: "{{ service_mtu - 28 }}"
+
+######################
+## OpenStack options
+######################
+disabled_services:
+  - disable-service.image
+  - disable-service.identity
+  - disable-service.object-store
+  - disable-service.load-balancer
+  - disable-service.container-infra
+  - disable-service.dns
+  - disable-service.baremetal
+  - disable-service.gnocchi
+  - disable-service.database
+  - disable-service.orchestration
+  - disable-service.placement
+
+disabled_metrics:
+  - nova-flavor
+  - nova-flavors
+  - nova-availability_zones
+  - nova-security_groups
+  - nova-total_vms
+  - nova-running_vms
+  - nova-current_workload
+  - nova-vcpus_available
+  - nova-vcpus_used
+  - nova-memory_available_bytes
+  - nova-memory_used_bytes
+  - nova-local_storage_available_bytes
+  - nova-local_storage_used_bytes
+  - nova-free_disk_bytes
+  - nova-server_status
+  - neutron-floating_ips
+  - neutron-floating_ips_associated_not_active
+  - neutron-floating_ip
+  - neutron-networks
+  - neutron-security_groups
+  - neutron-subnets
+  - neutron-port
+  - neutron-ports
+  - neutron-ports_no_ips
+  - neutron-ports_lb_not_active
+  - neutron-router
+  - neutron-routers
+  - neutron-routers_not_active
+  - neutron-l3_agent_of_router
+  - neutron-network_ip_availabilities_total
+  - neutron-network_ip_availabilities_used
+  - neutron-subnets_total
+  - neutron-subnets_used
+  - neutron-subnets_free
+  - cinder-volumes
+  - cinder-snapshots
+  - cinder-volume_gb
+  - cinder-volume_status
+  - cinder-volume_status_counter
+  - cinder-pool_capacity_free_gb
+  - cinder-pool_capacity_total_gb
+
+####################
+## Smartctl options
+####################
+device_include:
+  - /dev/sd
+  - /dev/nvme
+
+###################
+## Node options
+###################
+systemd_unit_include:
+  - crond.service
+  - docker.service
+  - ovs-vswitchd.service
+  - ovsdb-server.service
+  - rsyslog.service

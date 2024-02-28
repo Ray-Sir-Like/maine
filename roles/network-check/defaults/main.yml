@@ -1,0 +1,7 @@
+---
+ping_count: 10
+ping_interval: 0.2
+
+ping_allowed_avg: 0.200
+ping_allowed_max: 0.500
+ping_allowed_loss: 0.0

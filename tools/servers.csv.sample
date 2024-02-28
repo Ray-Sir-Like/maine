@@ -1,0 +1,2 @@
+hostname,hostname_in_inventory,ipmi_address,ipmi_username,ipmi_password,pxe_address,gateway,vlan2003,vlan2004,vlan2005,vlan2006,vlan2007,vlan2009
+control1,control1.ssh,10.0.100.10,admin,admin,10.10.10.10,192.168.30.254,192.168.30.31,192.168.40.31,192.168.50.31,192.168.60.31,192.168.70.31,192.168.80.31

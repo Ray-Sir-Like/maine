@@ -1,0 +1,84 @@
+---
+- name: Set hosts FQDN in DNS
+  hosts: localhost
+  vars:
+    networks:
+      vlan2003: 'storage'
+      vlan2004: 'storagemgmt'
+      vlan2005: 'internalapi'
+      vlan2006: 'external'
+      vlan2007: 'tenant'
+      vlan2009: 'lbmgmt'
+    csv_file: '/etc/kolla/config/bifrost/servers.csv'
+    auth_url: 'http://10.0.218.42:35357/v3'
+    username: 'admin'
+    password: 'ustack'
+    project_name: 'admin'
+    os_user_domain_name: 'Default'
+    os_project_domain_name: 'Default'
+    qs_id: ''
+    domain_name: "qs{{ qs_id }}.in."
+    hostname_default_network: 'vlan2005'
+    vip:
+      - hostname: 'vip'
+        vlan2003: '10.0.3.30'
+        vlan2004: '10.0.4.30'
+        vlan2005: '10.0.5.30'
+        vlan2006: '10.0.6.30'
+        vlan2007: '10.0.7.30'
+        vlan2009: '10.0.9.30'
+    ensure_state: 'present'
+  tasks:
+    - name: Get hosts from CSV
+      read_csv:
+        path: "{{ csv_file }}"
+      register: servers
+
+    - name: Add DNS Zone
+      os_zone:
+        auth:
+          auth_url: "{{ auth_url }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+          project_name: "{{ project_name }}"
+          os_user_domain_name: "{{ os_user_domain_name }}"
+          os_project_domain_name: "{{ os_project_domain_name }}"
+        description: "QS{{ qs_id }} Node Zone for Test"
+        email: 'robot@unitedstack.com'
+        name: "{{ domain_name }}"
+        state: "{{ ensure_state }}"
+        zone_type: 'primary'
+
+    - name: Add DNS Recordsets
+      os_recordset:
+        auth:
+          auth_url: "{{ auth_url }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+          project_name: "{{ project_name }}"
+          os_user_domain_name: "{{ os_user_domain_name }}"
+          os_project_domain_name: "{{ os_project_domain_name }}"
+        description: "{{ item[0].hostname ~ ' ' ~ networks[item[1]] ~ ' Record on QS' ~ qs_id ~ ' Node for Test' }}"
+        name: "{{ item[0].hostname ~ '.' ~ networks[item[1]] ~ '.' ~ domain_name }}"
+        records: ["{{ item[0][item[1]] }}"]
+        recordset_type: 'A'
+        state: "{{ ensure_state }}"
+        zone: "{{ domain_name }}"
+      loop: "{{ (servers.list + vip) | product(networks) | list }}"
+
+    - name: Add DNS Recordsets for hostname
+      os_recordset:
+        auth:
+          auth_url: "{{ auth_url }}"
+          username: "{{ username }}"
+          password: "{{ password }}"
+          project_name: "{{ project_name }}"
+          os_user_domain_name: "{{ os_user_domain_name }}"
+          os_project_domain_name: "{{ os_project_domain_name }}"
+        description: "{{ item.hostname ~ ' Record on QS' ~ qs_id ~ ' Node for Test' }}"
+        name: "{{ item.hostname ~ '.' ~ domain_name }}"
+        records: ["{{ item.hostname ~ '.' ~ networks[hostname_default_network] ~ '.' ~ domain_name }}"]
+        recordset_type: 'CNAME'
+        state: "{{ ensure_state }}"
+        zone: "{{ domain_name }}"
+      loop: "{{ servers.list + vip }}"

@@ -1,0 +1,9 @@
+---
+- name: Removing ryze images
+  become: true
+  docker_image:
+    name: "{{ item.value.image }}"
+    state: absent
+    force: yes
+  with_dict: "{{ ryze_services }}"
+  tags: ryze

@@ -1,0 +1,67 @@
+---
+- name: Restart logging-opensearch container
+  vars:
+    service_name: "logging-opensearch"
+    service: "{{ logging_services[service_name] }}"
+    config_json: "{{ logging_config_jsons.results|selectattr('item.key', 'equalto', service_name)|first }}"
+    opensearch_container: "{{ check_logging_containers.results|selectattr('item.key', 'equalto', service_name)|first }}"
+  become: true
+  kolla_docker:
+    action: "recreate_or_restart_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ service.container_name }}"
+    image: "{{ service.image }}"
+    environment: "{{ service.environment }}"
+    volumes: "{{ service.volumes }}"
+    dimensions: "{{ service.dimensions }}"
+  when:
+    - kolla_action != "config"
+
+- name: Restart logging-opensearch-curator container
+  vars:
+    service_name: "logging-opensearch-curator"
+    service: "{{ logging_services[service_name] }}"
+  become: true
+  kolla_docker:
+    action: "recreate_or_restart_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ service.container_name }}"
+    image: "{{ service.image }}"
+    volumes: "{{ service.volumes }}"
+    dimensions: "{{ service.dimensions }}"
+  when:
+    - kolla_action != "config"
+
+- name: Restart logging-opensearch-dashboards container
+  vars:
+    service_name: "logging-opensearch-dashboards"
+    service: "{{ logging_services[service_name] }}"
+    config_json: "{{ logging_config_jsons.results|selectattr('item.key', 'equalto', service_name)|first }}"
+    opensearch_dashboards_container: "{{ check_logging_containers.results|selectattr('item.key', 'equalto', service_name)|first }}"
+  become: true
+  kolla_docker:
+    action: "recreate_or_restart_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ service.container_name }}"
+    image: "{{ service.image }}"
+    volumes: "{{ service.volumes }}"
+    environment: "{{ service.environment }}"
+    dimensions: "{{ service.dimensions }}"
+  when:
+    - kolla_action != "config"
+
+- name: Restart logging-fluentd container
+  vars:
+    service_name: "logging-fluentd"
+    service: "{{ logging_services[service_name] }}"
+  become: true
+  kolla_docker:
+    action: "recreate_or_restart_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ service.container_name }}"
+    image: "{{ service.image }}"
+    volumes: "{{ service.volumes }}"
+    environment: "{{ service.environment }}"
+    dimensions: "{{ service.dimensions }}"
+  when:
+    - kolla_action != "config"

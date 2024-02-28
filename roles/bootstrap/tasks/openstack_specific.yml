@@ -1,0 +1,39 @@
+---
+- name: Remove packages conflicted with OpenStack
+  package:
+    name: "{{ openstack_pkg_removals }}"
+    state: absent
+  become: True
+
+- name: Install packages that openstack depends on
+  package:
+    name: "{{ openstack_pkg_installs }}"
+    state: present
+  become: True
+
+- name: Ensure node_config_directory directory exists
+  file:
+    path: "{{ node_config_directory }}"
+    state: directory
+    mode: 0755
+  become: True
+
+# FIXME(Yao Ning): Currently support openstack only since openstack inventory role's definition is needed
+# FIMXE(Yao Ning): Maybe extract nodes' role from ceph orch or bifrost ironic?
+- name: Install and Configure Cluster Shell
+  block:
+    - name: Install clustershell
+      package:
+        name: clustershell
+        state: present
+      become: True
+      delegate_to: "{{ groups['deployment'][0] }}"
+      run_once: True
+
+    - name: Config clustershell
+      template:
+        src: groups.j2
+        dest: /etc/clustershell/groups
+      become: True
+      delegate_to: "{{ groups['deployment'][0] }}"
+      run_once: True

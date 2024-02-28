@@ -1,0 +1,21 @@
+setuid = pdns
+setgid = pdns
+api = yes
+api-key = {{ pdns_api_key }}
+webserver = yes
+webserver-address = {{ api_interface_address }}
+webserver-port = {{ pdns_webserver_port }}
+webserver-allow-from = 0.0.0.0/0,::/0
+
+local-address = {{ kolla_external_vip_address }}
+local-port = {{ designate_bind_port }}
+slave = yes
+slave-cycle-interval = 60
+zone-cache-refresh-interval = 20
+
+launch = gmysql
+gmysql-host = {{ pdns_database_address }}
+gmysql-port = {{ pdns_database_port }}
+gmysql-user = {{ pdns_database_user }}
+gmysql-password = {{ pdns_database_password }}
+gmysql-dbname = {{ pdns_database_name }}

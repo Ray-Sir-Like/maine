@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+
+# Copyright 2018-2020 UnitedStack (Beijing) CO.,LTD.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import logging
+import yaml
+
+import ironic_inspector_client
+
+from ironicclient import client
+from ironicclient.common import utils
+
+
+logger = logging.getLogger()
+logging.basicConfig(level=logging.INFO,
+                            format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+INSPECTOR_URL='http://localhost:7050/'
+
+kwargs = {'endpoint': 'http://localhost:7385/'}
+
+ironic = client.get_client(1, **kwargs)
+inspector_client = ironic_inspector_client.ClientV1(
+    inspector_url=INSPECTOR_URL)
+
+output_data = {}
+
+
+# set baremetal hosts info from ironic
+nodes = ironic.node.list(detail=True)
+
+for node in nodes:
+    ipmi_address = node.extra['ipmi_address']
+    ipmi_username = node.extra['ipmi_username']
+    ipmi_password = node.extra['ipmi_password']
+
+    # TODO(Xing Zhang): client in python dose not support uppercase
+    # but client in shell can
+    hostname = node.extra['hostname'].lower()
+    pxe_address = node.extra['pxe_address']
+
+    node_state = node.provision_state
+    if node_state != 'available' and node_state != 'deploy failed':
+        logging.warn('skip {node} deploying, node state is '
+                     'not available'.format(node=hostname))
+        continue
+
+    try:
+        node_inspect_data = inspector_client.get_data(
+                node_id=node.uuid)
+
+        # prepare output_data for servers.yml
+        output_data[hostname] = {}
+        output_data[hostname]['driver'] = 'ipmi'
+        output_data[hostname]['driver_info'] = {
+            'power': {
+                'ipmi_address': ipmi_address,
+                'ipmi_password': ipmi_password,
+                'ipmi_username': ipmi_username
+            }
+        }
+        output_data[hostname]['instance_info'] = dict()
+        output_data[hostname]['instance_info']['capabilities'] = dict()
+        output_data[hostname]['instance_info']['capabilities']['boot_option'] = 'local'
+        if node_inspect_data['inventory']['boot']['current_boot_mode'] == 'uefi':
+            output_data[hostname]['instance_info']['capabilities']['boot_mode'] = 'uefi'
+        else:
+            logging.warn('{node}({ipaddr}) boot_mode is not uefi, please check server '
+                         'bios setting and retry.'.format(node=hostname, 
+                                                          ipaddr=pxe_address))
+
+{% if ironic_user_image_name is defined %}
+        if node_inspect_data['cpu_arch'] == "x86_64":
+            output_data[hostname]['instance_info']['image_source'] = "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ironic_user_image_name }}"
+            output_data[hostname]['instance_info']['image_checksum'] = "{{ ironic_user_image_checksum }}"
+{% endif %}
+
+{% if ironic_aarch64_user_image_name is defined %}
+        if node_inspect_data['cpu_arch'] == "aarch64":
+            output_data[hostname]['instance_info']['image_source'] = "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ironic_aarch64_user_image_name }}"
+            output_data[hostname]['instance_info']['image_checksum'] = "{{ ironic_aarch64_user_image_checksum }}"
+{% endif %}
+
+        output_data[hostname]['ipv4_address'] = pxe_address
+        output_data[hostname]['name'] = hostname
+        output_data[hostname]['nics'] = [
+            {
+                "mac": node_inspect_data['macs'][0]
+            }
+        ]
+        output_data[hostname]['uuid'] = node.uuid
+
+    except Exception as e:
+        logging.info('Node may not be inspected, Please inpect node first.'
+                     'Error is {error}'.format(error=e))
+
+# and write hosts info to servers.yml
+with open('/etc/bifrost/servers.yml', 'w') as yamlfile:
+    yaml.safe_dump(output_data, yamlfile, default_flow_style=False)

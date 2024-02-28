@@ -1,0 +1,18 @@
+{
+    "command": "malphite -config /etc/malphite/malphite.yml -log_level {{ malphite_log_level }}",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/malphite.yml",
+            "dest": "/etc/malphite/malphite.yml",
+            "owner": "malphite",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/malphite",
+            "owner": "malphite:malphite",
+            "recurse": true
+        }
+    ]
+}

@@ -1,0 +1,16 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Recover mariadb
+  hosts: mariadb
+  vars:
+    kolla_action: "{{ maine_action }}"
+    mariadb_recover: true
+  roles:
+    - { role: mariadb,
+        tags: mariadb,
+        when: enable_mariadb | bool and not enable_hacluster | bool }
+
+    - { role: pcs-mariadb,
+        tags: mariadb,
+        when: enable_mariadb | bool and enable_hacluster | bool }

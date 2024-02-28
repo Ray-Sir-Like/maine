@@ -1,0 +1,123 @@
+---
+- name: Ensuring config directories exist
+  file:
+    path: "{{ node_config_directory }}/{{ item.key }}"
+    state: "directory"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0770"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ juggernaut_services }}"
+
+- name: Check if policies shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: juggernaut_policy
+  with_first_found:
+    - files: "{{ supported_policy_format_list }}"
+      paths:
+        - "{{ node_custom_config }}/juggernaut/"
+      skip: true
+
+- name: Set juggernaut policy file
+  set_fact:
+    juggernaut_policy_file: "{{ juggernaut_policy.results.0.stat.path | basename }}"
+    juggernaut_policy_file_path: "{{ juggernaut_policy.results.0.stat.path }}"
+  when:
+    - juggernaut_policy.results
+
+- name: Copying over extra CA certificates
+  become: true
+  copy:
+    src: "{{ node_config }}/certificates/ca/"
+    dest: "{{ node_config_directory }}/{{ item.key }}/ca-certificates"
+    mode: "0644"
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+    - kolla_copy_ca_into_containers | bool
+  with_dict: "{{ juggernaut_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over existing policy file
+  template:
+    src: "{{ juggernaut_policy_file_path }}"
+    dest: "{{ node_config_directory }}/{{ item }}/{{ juggernaut_policy_file }}"
+    mode: "0660"
+  become: true
+  when:
+    - juggernaut_policy_file is defined
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ juggernaut_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- name: Copying over config.json files for services
+  template:
+    src: "{{ item.key }}.json.j2"
+    dest: "{{ node_config_directory }}/{{ item.key }}/config.json"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ juggernaut_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- name: Copying over juggernaut.conf
+  vars:
+    service_name: "{{ item.key }}"
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/juggernaut.conf.j2"
+      - "{{ node_custom_config }}/global.conf"
+      - "{{ node_custom_config }}/juggernaut.conf"
+      - "{{ node_custom_config }}/juggernaut/{{ item.key }}.conf"
+      - "{{ node_custom_config }}/juggernaut/{{ inventory_hostname }}/juggernaut.conf"
+    dest: "{{ node_config_directory }}/{{ item.key }}/juggernaut.conf"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ juggernaut_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- name: Copying over wsgi-juggernaut file for services
+  vars:
+    service_name: "juggernaut-api"
+    service: "{{ juggernaut_services['juggernaut-api'] }}"
+  template:
+    src: "wsgi-juggernaut.conf.j2"
+    dest: "{{ node_config_directory }}/juggernaut-api/wsgi-juggernaut.conf"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service.group]
+    - service.enabled | bool
+  notify:
+    - Restart {{ service_name }} container
+
+- name: Copying over api-paste.ini
+  vars:
+    service_name: "juggernaut-api"
+    service: "{{ juggernaut_services['juggernaut-api'] }}"
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/juggernaut-api-paste.ini.j2"
+      - "{{ node_custom_config }}/juggernaut/juggernaut-api/juggernaut-api-paste.ini"
+    dest: "{{ node_config_directory }}/juggernaut-api/juggernaut-api-paste.ini"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service.group]
+    - service.enabled | bool
+  notify:
+    - Restart {{ service_name }} container

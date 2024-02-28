@@ -1,0 +1,23 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Bifrost configuration sanity check
+  gather_facts: false
+  hosts: deployment
+  tasks:
+    - name: Check for seed interface is configured
+      fail:
+        msg: "seed_interface must be manually
+          configured in `/etc/maine/globals.yml`"
+      when:
+        - seed_interface is not defined
+
+- name: Apply role bootstrap
+  gather_facts: false
+  hosts:
+    - baremetal
+    - deployment
+  serial: '{{ kolla_serial|default("0") }}'
+  roles:
+    - role: bootstrap
+      tags: bootstrap

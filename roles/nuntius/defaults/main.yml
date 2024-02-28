@@ -1,0 +1,57 @@
+---
+project_name: "nuntius"
+
+nuntius_services:
+  nuntius:
+    container_name: nuntius
+    group: nuntius
+    enabled: "{{ enable_nuntius | bool }}"
+    image: "{{ nuntius_image_full }}"
+    volumes: "{{ nuntius_default_volumes + nuntius_extra_volumes }}"
+    dimensions: "{{ nuntius_dimensions }}"
+    healthcheck: "{{ nuntius_healthcheck }}"
+    haproxy:
+      nuntius:
+        enabled: "{{ enable_nuntius }}"
+        mode: "http"
+        external: false
+        port: "{{ nuntius_port }}"
+
+####################
+# Docker
+####################
+nuntius_install_type: "{{ kolla_install_type }}"
+
+nuntius_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hawkeye-nuntius"
+nuntius_tag: "{{ openstack_tag }}"
+nuntius_image_full: "{{ nuntius_image }}:{{ nuntius_tag }}"
+
+nuntius_dimensions: "{{ default_container_dimensions }}"
+
+nuntius_enable_healthchecks: "{{ enable_container_healthchecks }}"
+nuntius_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+nuntius_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+nuntius_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+nuntius_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ nuntius_port }} "]
+nuntius_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+nuntius_healthcheck:
+  interval: "{{ nuntius_healthcheck_interval }}"
+  retries: "{{ nuntius_healthcheck_retries }}"
+  start_period: "{{ nuntius_healthcheck_start_period }}"
+  test: "{% if nuntius_enable_healthchecks | bool %}{{ nuntius_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ nuntius_healthcheck_timeout }}"
+
+nuntius_default_volumes:
+  - "{{ node_config_directory }}/nuntius/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+nuntius_extra_volumes: "{{ default_extra_volumes }}"
+
+####################
+# Database
+####################
+nuntius_use_db: False
+nuntius_database_name: "nuntius"
+nuntius_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}nuntius{% endif %}"
+nuntius_database_address: "{{ database_address }}:{{ database_port }}"

@@ -1,0 +1,49 @@
+---
+- name: Ensure domain heat_user_domain existed
+  kolla_toolbox:
+    module_name: "os_keystone_domain"
+    module_args:
+      name: heat_user_domain
+      region_name: "{{ openstack_region_name }}"
+      auth: "{{ openstack_auth }}"
+      interface: "{{ openstack_interface }}"
+      cacert: "{{ openstack_cacert }}"
+  become: true
+  run_once: True
+  tags: heat
+
+- name: Ensure user heat_domain_admin existed
+  kolla_toolbox:
+    module_name: "os_user"
+    module_args:
+      name: heat_domain_admin
+      password: "{{ heat_domain_admin_password }}"
+      domain: heat_user_domain
+      region_name: "{{ openstack_region_name }}"
+      auth: "{{ openstack_auth }}"
+      interface: "{{ openstack_interface }}"
+      cacert: "{{ openstack_cacert }}"
+  become: true
+  run_once: True
+  tags: heat
+
+- name: Ensure role assignment for heat_user_domain
+  kolla_toolbox:
+    module_name: "os_user_role"
+    module_args:
+      user: heat_domain_admin
+      role: admin
+      domain: heat_user_domain
+      region_name: "{{ openstack_region_name }}"
+      auth: "{{ openstack_auth }}"
+      interface: "{{ openstack_interface }}"
+      cacert: "{{ openstack_cacert }}"
+  become: true
+  run_once: True
+  tags: heat
+
+- name: Ensure heat_domain_admin user security compliance
+  import_tasks: user_security_compliance.yml
+  vars:
+    username: "heat_domain_admin"
+  tags: heat

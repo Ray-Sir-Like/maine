@@ -1,0 +1,181 @@
+---
+- name: Ensure python octaviaclient
+  package:
+    name: "{{ octaviaclient }}"
+    state: present
+  tags:
+    - octavia
+  when:
+    - with_os_client | bool
+
+- name: Adjust the Octavia project quota
+  kolla_toolbox:
+    module_name: "os_quota"
+    module_args:
+      name: "service"
+      cores: -1
+      fixed_ips: -1
+      floating_ips: -1
+      floatingip: -1
+      gigabytes: -1
+      instances: -1
+      key_pairs: -1
+      network: -1
+      per_volume_gigabytes: -1
+      port: -1
+      properties: -1
+      ram: -1
+      router: -1
+      security_group: -1
+      security_group_rule: -1
+      server_group_members: -1
+      server_groups: -1
+      snapshots: -1
+      subnet: -1
+      subnetpool: -1
+      volumes: -1
+      auth: "{{ openstack_auth }}"
+      region_name: "{{ openstack_region_name }}"
+      endpoint_type: "{{ openstack_interface }}"
+      cacert: "{{ kolla_admin_openrc_cacert if kolla_enable_tls_internal|bool else '' }}"
+  become: True
+  run_once: True
+  tags:
+    - octavia
+
+- name: Upload octavia amphora flavor
+  block:
+    - name: Get amphora flavor info
+      command: >
+        {{ docker_cmd }} openstack
+        --os-interface internal
+        --os-auth-url {{ openstack_auth.auth_url }}
+        --os-identity-api-version 3
+        --os-project-domain-name {{ openstack_auth.domain_name }}
+        --os-tenant-name {{ openstack_auth.project_name }}
+        --os-username {{ openstack_auth.username }}
+        --os-password {{ openstack_auth.password }}
+        --os-user-domain-name {{ openstack_auth.domain_name }}
+        {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+        flavor show amphora -f value -c id
+      changed_when: False
+      run_once: True
+      register: amphora_flavor_results
+
+    - name: Set amphora flavor resources facts
+      set_fact:
+        amphora_flavor_id: "{{ amphora_flavor_results.stdout }}"
+
+    - name: Upload octavia amphora flavor
+      command: >
+        {{ docker_cmd }} openstack
+        --os-interface internal
+        --os-auth-url {{ openstack_auth.auth_url }}
+        --os-identity-api-version 3
+        --os-project-domain-name {{ openstack_auth.domain_name }}
+        --os-tenant-name {{ openstack_auth.project_name }}
+        --os-username {{ openstack_auth.username }}
+        --os-password {{ openstack_auth.password }}
+        --os-user-domain-name {{ openstack_auth.domain_name }}
+        {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+        flavor set {{ amphora_flavor_id }}
+        --property hw:cpu_name=EPYC
+        --property hw:cpu_vendor=AuthenticAMD
+        --property "hw:cpu_model_id={{ octavia_flavor_hygon_cpu_model }}"
+        --property hw:cpu_sockets=2
+        --property hw:cpu_cores=2
+      changed_when: False
+  when: octavia_flavor_hygon | bool
+  tags:
+    - octavia
+
+- name: Check octavia amphora image exist
+  shell: >
+    {{ docker_cmd }} openstack \
+    --os-interface internal \
+    --os-auth-url {{ openstack_auth.auth_url }} \
+    --os-identity-api-version 3 \
+    --os-project-domain-name {{ openstack_auth.domain_name }} \
+    --os-tenant-name {{ openstack_auth.project_name }} \
+    --os-username {{ openstack_auth.username }} \
+    --os-password {{ openstack_auth.password }} \
+    --os-user-domain-name {{ openstack_auth.domain_name }} \
+    {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %} \
+    image list --name amphora-{{ octavia_amp_arch }}-haproxy -f value -c ID | wc -l
+  register: image_count
+  become: True
+  changed_when: False
+  run_once: True
+  tags:
+    - octavia
+
+- name: Check octavia amphora image(file)
+  block:
+    - name: failed when file not exists
+      stat:
+        path: "{{ octavia_amp_image }}"
+      register: octavia_amp_image_file
+      failed_when: not octavia_amp_image_file.stat.exists
+
+    - name: Upload octavia amphora image
+      command: >
+        {{ docker_cmd }} openstack
+        --os-interface internal
+        --os-auth-url {{ openstack_auth.auth_url }}
+        --os-identity-api-version 3
+        --os-project-domain-name {{ openstack_auth.domain_name }}
+        --os-tenant-name {{ openstack_auth.project_name }}
+        --os-username {{ openstack_auth.username }}
+        --os-password {{ openstack_auth.password }}
+        --os-user-domain-name {{ openstack_auth.domain_name }}
+        {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %}
+        image create
+        --container-format bare
+        --disk-format raw
+        --file {{ octavia_amp_image }}
+        --tag amphora
+        --project service
+        --private
+        --protected
+        --property os_hidden='True'
+        --property architecture={{ octavia_amp_arch }}
+        amphora-{{ octavia_amp_arch }}-haproxy
+      changed_when: false
+  when:
+    - not image_count.stdout | bool
+    - not octavia_amp_image | regex_search('^http')
+  become: True
+  run_once: True
+  tags:
+    - octavia
+
+- name: Check octavia amphora image(http)
+  block:
+    - name: failed when http resource not exists
+      command: curl --retry 5 -I -m 10 -o /dev/null -s -w %{http_code} {{ octavia_amp_image }}
+      register: octavia_amp_image_http
+      failed_when: octavia_amp_image_http.stdout != '200'
+
+    - name: Upload octavia amphora image
+      command: >
+        {{ docker_cmd }} glance
+        --os-endpoint-type internal
+        --os-auth-url {{ openstack_auth.auth_url }}
+        --os-project-domain-name {{ openstack_auth.domain_name }}
+        --os-tenant-name service
+        --os-username octavia
+        --os-password {{ octavia_keystone_password }}
+        --os-user-domain-name {{ openstack_auth.domain_name }}
+        {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %}
+        task-create
+        --type import
+        --input '{"image_properties": {"container_format": "bare", "disk_format": "raw", "name": "amphora-{{ octavia_amp_arch }}-haproxy", "tags": ["amphora"], "visibility": "private","architecture": "{{ octavia_amp_arch }}"}, "import_from": "{{ octavia_amp_image }}", "import_from_format": "raw"}'
+
+  when:
+    - not image_count.stdout | bool
+    - octavia_amp_image | regex_search('^http')
+  become: True
+  ignore_errors: True
+  run_once: True
+  tags:
+    - octavia

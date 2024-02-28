@@ -1,0 +1,46 @@
+---
+project_name: "captain"
+
+captain_services:
+  captain:
+    container_name: captain
+    group: captain
+    enabled: true
+    image: "{{ captain_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/captain/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ captain_dimensions }}"
+    healthcheck: "{{ captain_healthcheck }}"
+
+####################
+# Docker
+####################
+captain_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/captain"
+captain_tag: "{{ openstack_tag }}"
+captain_image_full: "{{ captain_image }}:{{ captain_tag }}"
+captain_dimensions: "{{ default_container_dimensions }}"
+
+captain_enable_healthchecks: "{{ enable_container_healthchecks }}"
+captain_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+captain_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+captain_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+captain_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ 'bifrost_network' | kolla_address(groups['deployment'][0]) | put_address_in_context('url') }}:{{ captain_port }} "]
+captain_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+captain_healthcheck:
+  interval: "{{ captain_healthcheck_interval }}"
+  retries: "{{ captain_healthcheck_retries }}"
+  start_period: "{{ captain_healthcheck_start_period }}"
+  test: "{% if captain_enable_healthchecks | bool %}{{ captain_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ captain_healthcheck_timeout }}"
+
+####################
+# Firewall
+####################
+captain_firewall_zone: "{{ firewall_zone }}"
+
+####################
+# captain
+####################
+captain_log_dir: /var/log/kolla/captain

@@ -1,0 +1,18 @@
+{
+    "command": "/opt/nuntius/nuntius -bind {{ monitoring_interface_address }}:{{ nuntius_port }} -config /etc/nuntius/nuntius.yml -log_level {{ nuntius_log_level }} -source_id {{ nuntius_source_id }}",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/nuntius.yml",
+            "dest": "/etc/nuntius/nuntius.yml",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/notifications.tmpl",
+            "dest": "/etc/nuntius/notifications.tmpl",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": []
+}

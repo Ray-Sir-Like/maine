@@ -1,0 +1,48 @@
+---
+- name: Ensure python barbicanclient
+  package:
+    name: "{{ barbicanclient }}"
+    state: present
+  tags:
+    - barbican
+  when:
+    - with_os_client | bool
+
+- name: Create Barbican kms 3party integration user and role
+  import_role:
+    name: service-ks-register
+  vars:
+    project_name: barbican
+    service_ks_register_auth: "{{ openstack_auth }}"
+    service_ks_register_services: "{{ barbican_ks_services }}"
+    service_ks_register_users: "{{ barbican_ks_users }}"
+    barbican_ks_services:
+      - name: "barbican"
+        type: "key-manager"
+        description: "Barbican Key Management Service"
+        endpoints:
+          - {'interface': 'admin', 'url': '{{ barbican_admin_endpoint }}'}
+          - {'interface': 'internal', 'url': '{{ barbican_internal_endpoint }}'}
+          - {'interface': 'public', 'url': '{{ barbican_public_endpoint }}'}
+    barbican_ks_users:
+      - project: "service"
+        user: "{{ barbican_3party_integration_user }}"
+        password: "{{ barbican_keystone_password }}"
+        role: "{{ barbican_3party_integration_role }}"
+  tags:
+    - barbican
+
+- name: Create Barbican kms 3party implied role
+  shell: |
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && openstack implied role create --implied-role creator member || true"
+  changed_when: false
+  run_once: True
+  tags:
+    - barbican
+
+- name: "Ensure {{ barbican_3party_integration_user }} user security compliance"
+  import_tasks: user_security_compliance.yml
+  vars:
+    username: "{{ barbican_3party_integration_user }}"
+  tags:
+    - barbican

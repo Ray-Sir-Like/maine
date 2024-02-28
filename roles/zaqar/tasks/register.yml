@@ -1,0 +1,7 @@
+---
+- import_role:
+    name: service-ks-register
+  vars:
+    service_ks_register_auth: "{{ openstack_zaqar_auth }}"
+    service_ks_register_services: "{{ zaqar_ks_services }}"
+    service_ks_register_users: "{{ zaqar_ks_users }}"

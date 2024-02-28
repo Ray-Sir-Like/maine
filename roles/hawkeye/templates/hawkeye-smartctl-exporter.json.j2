@@ -1,0 +1,5 @@
+{
+    "command": "/usr/bin/smartctl_exporter --web.listen-address {{ monitoring_interface_address }}:{{ hawkeye_smartctl_exporter_port }} --smartctl.device-include ({{ device_include | join('|') }}).*",
+    "config_files": [],
+    "permissions": []
+}

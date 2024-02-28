@@ -1,0 +1,138 @@
+---
+project_name: "juggernaut"
+
+juggernaut_services:
+  juggernaut-api:
+    container_name: juggernaut_api
+    group: juggernaut-api
+    enabled: true
+    image: "{{ juggernaut_api_image_full }}"
+    volumes: "{{ juggernaut_api_default_volumes + juggernaut_api_extra_volumes }}"
+    dimensions: "{{ juggernaut_api_dimensions }}"
+    healthcheck: "{{ juggernaut_api_healthcheck }}"
+    haproxy:
+      juggernaut_api:
+        enabled: "{{ enable_juggernaut }}"
+        mode: "http"
+        external: false
+        port: "{{ juggernaut_api_port }}"
+      juggernaut_api_external:
+        enabled: "{{ enable_juggernaut }}"
+        mode: "http"
+        external: true
+        port: "{{ juggernaut_api_port }}"
+  juggernaut-engine:
+    container_name: juggernaut_engine
+    group: juggernaut-engine
+    enabled: true
+    image: "{{ juggernaut_engine_image_full }}"
+    volumes: "{{ juggernaut_engine_default_volumes + juggernaut_engine_extra_volumes }}"
+    dimensions: "{{ juggernaut_engine_dimensions }}"
+    healthcheck: "{{ juggernaut_engine_healthcheck }}"
+
+####################
+# Docker
+####################
+juggernaut_install_type: "{{ kolla_install_type }}"
+juggernaut_tag: "{{ openstack_tag }}"
+
+juggernaut_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/juggernaut-api"
+juggernaut_api_tag: "{{ juggernaut_tag }}"
+juggernaut_api_image_full: "{{ juggernaut_api_image }}:{{ juggernaut_api_tag }}"
+
+juggernaut_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/juggernaut-engine"
+juggernaut_engine_tag: "{{ juggernaut_tag }}"
+juggernaut_engine_image_full: "{{ juggernaut_engine_image }}:{{ juggernaut_engine_tag }}"
+
+juggernaut_api_dimensions: "{{ default_container_dimensions }}"
+juggernaut_engine_dimensions: "{{ default_container_dimensions }}"
+
+juggernaut_api_enable_healthchecks: "{{ enable_container_healthchecks }}"
+juggernaut_api_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+juggernaut_api_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+juggernaut_api_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+juggernaut_api_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ juggernaut_api_port }} "]
+juggernaut_api_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+juggernaut_api_healthcheck:
+  interval: "{{ juggernaut_api_healthcheck_interval }}"
+  retries: "{{ juggernaut_api_healthcheck_retries }}"
+  start_period: "{{ juggernaut_api_healthcheck_start_period }}"
+  test: "{% if juggernaut_api_enable_healthchecks | bool %}{{ juggernaut_api_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ juggernaut_api_healthcheck_timeout }}"
+
+juggernaut_engine_enable_healthchecks: "{{ enable_container_healthchecks }}"
+juggernaut_engine_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+juggernaut_engine_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+juggernaut_engine_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+juggernaut_engine_healthcheck_test: ["CMD-SHELL", "healthcheck_port juggernaut-engine {{ om_rpc_port }}"]
+juggernaut_engine_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+juggernaut_engine_healthcheck:
+  interval: "{{ juggernaut_engine_healthcheck_interval }}"
+  retries: "{{ juggernaut_engine_healthcheck_retries }}"
+  start_period: "{{ juggernaut_engine_healthcheck_start_period }}"
+  test: "{% if juggernaut_engine_enable_healthchecks | bool %}{{ juggernaut_engine_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ juggernaut_engine_healthcheck_timeout }}"
+
+juggernaut_api_default_volumes:
+  - "{{ node_config_directory }}/juggernaut-api/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+juggernaut_engine_default_volumes:
+  - "{{ node_config_directory }}/juggernaut-engine/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+juggernaut_extra_volumes: "{{ default_extra_volumes }}"
+juggernaut_api_extra_volumes: "{{ juggernaut_extra_volumes }}"
+juggernaut_engine_extra_volumes: "{{ juggernaut_extra_volumes }}"
+
+####################
+# OpenStack
+####################
+juggernaut_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ juggernaut_api_port }}"
+juggernaut_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ juggernaut_api_port }}"
+juggernaut_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ juggernaut_api_port }}"
+
+juggernaut_logging_debug: "{{ openstack_logging_debug }}"
+
+juggernaut_keystone_user: "juggernaut"
+openstack_juggernaut_auth: "{{ openstack_auth }}"
+
+juggernaut_service_auth_project: "service"
+
+#####################
+# Integration Options
+#####################
+juggernaut_ssh_key_name: "juggernaut_ssh_key"
+
+juggernaut_user_auth:
+  auth_url: "{{ keystone_admin_url }}"
+  username: "juggernaut"
+  password: "{{ juggernaut_keystone_password }}"
+  project_name: "{{ juggernaut_service_auth_project }}"
+  domain_name: "{{ default_project_domain_name }}"
+
+####################
+# Database
+####################
+juggernaut_database_name: "juggernaut"
+juggernaut_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}juggernaut{% endif %}"
+juggernaut_database_address: "{{ database_address }}:{{ database_port }}"
+
+####################
+# Keystone
+####################
+juggernaut_ks_services:
+  - name: "juggernaut"
+    type: "migration"
+    description: "UnitedStack Migration Services"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ juggernaut_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ juggernaut_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ juggernaut_public_endpoint }}'}
+
+juggernaut_ks_users:
+  - project: "service"
+    user: "{{ juggernaut_keystone_user }}"
+    password: "{{ juggernaut_keystone_password }}"
+    role: "admin"

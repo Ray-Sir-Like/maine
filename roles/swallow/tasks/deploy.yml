@@ -1,0 +1,20 @@
+---
+- import_tasks: register.yml
+  when: inventory_hostname in groups['swallow-api']
+
+- import_tasks: config.yml
+  when: inventory_hostname in groups['swallow-api'] or
+        inventory_hostname in groups['swallow-policyengine'] or
+        inventory_hostname in groups['swallow-taskengine'] or
+        inventory_hostname in groups['swallow-monitor']
+
+- import_tasks: check-containers.yml
+
+- import_tasks: clone.yml
+  when: swallow_dev_mode | bool
+
+- import_tasks: bootstrap.yml
+  when: inventory_hostname in groups['swallow-api']
+
+- name: Flush handlers
+  meta: flush_handlers

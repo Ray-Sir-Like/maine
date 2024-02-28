@@ -1,0 +1,18 @@
+{
+    "command": "/opt/alertmanager/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --web.listen-address={{ monitoring_interface_address }}:{{ hawkeye_alertmanager_port }} --storage.path=/alertmanager {% if groups["hawkeye"] | length > 1 %} --cluster.listen-address={{ monitoring_interface_address }}:{{ hawkeye_alertmanager_cluster_port }} {% for host in groups["hawkeye"] %} --cluster.peer={{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hostvars[host]['hawkeye_alertmanager_cluster_port'] }}{% endfor %}{% endif %}",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/alertmanager.yml",
+            "dest": "/etc/alertmanager/alertmanager.yml",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/alertmanager",
+            "owner": "root:root",
+            "recurse": false
+        }
+    ]
+}

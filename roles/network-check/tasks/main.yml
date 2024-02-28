@@ -1,0 +1,38 @@
+---
+- include_vars: "/etc/maine/globals.yml"
+  tags: network_check
+
+- name: Check servers.csv stat
+  local_action: stat path="{{ node_custom_config }}/bifrost/servers.csv"
+  register: servers_csv
+  tags: network_check
+
+- block:
+    - name: Read servers.csv
+      local_action: read_csv path="{{ node_custom_config }}/bifrost/servers.csv"
+      register: csv_data
+
+    - name: Get a list of vlans
+      set_fact:
+        vlans: "{% set vlans = [] %}{% for vlan in csv_data.list.1 %}{% if vlan|regex_search('vlan[0-9]+') %}{{ vlans.append(vlan) }}{% endif %}{% endfor %}{{ vlans }}"
+  when: servers_csv.stat.exists
+  tags: network_check
+
+- name: Ping each network with module
+  ustack_ping:
+    ipaddr: "{{ hostvars[item.1][item.0] }}"
+    nic: "{{ hostvars[inventory_hostname][item.0] }}"
+    count: "{{ ping_count }}"
+    interval: "{{ ping_interval }}"
+    mtu: "{{ [service_mtu, hostvars[item.1]['service_mtu']] | min }}"
+    allowed_avg: "{{ ping_allowed_avg }}"
+    allowed_max: "{{ ping_allowed_max }}"
+    allowed_loss: "{{ ping_allowed_loss }}"
+  when:
+    - inventory_hostname != item.1
+    - hostvars[item.1][item.0] is defined
+    - hostvars[item.1][item.0] != ''
+    - hostvars[inventory_hostname][item.0] is defined
+    - hostvars[inventory_hostname][item.0] != ''
+  loop: "{{ vlans | product(groups['baremetal']) | list }}"
+  tags: network_check

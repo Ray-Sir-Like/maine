@@ -1,0 +1,22 @@
+{
+  "server": {
+    "host": "{{ api_interface_address }}",
+    "port": "{{ ryze_listen_port }}"
+  },
+  "cookie": {
+    "secret": "tfcloud-ryze"
+  },
+  "auth": {
+    "auth_url": "{{ keystone_public_url }}"
+  },
+  "redis": {
+    "address": "{{ redis_connection_string }}"
+  },
+  "nuntius": {
+    "url": "{{ kolla_external_vip_address }}:{{ nuntius_port }}",
+    "receiver": {
+      "sms": "sms_notify",
+      "email": "email_notify"
+    }
+  }
+}

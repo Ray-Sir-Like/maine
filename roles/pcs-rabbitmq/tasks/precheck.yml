@@ -1,0 +1,44 @@
+---
+- name: Check if all rabbit hostnames are resolvable
+  vars:
+    nss_database: "{{ 'ahostsv4' if api_address_family == 'ipv4' else 'ahostsv6' }}"
+  command: "getent {{ nss_database }} {{ hostvars[item].ansible_facts.hostname }}"
+  changed_when: false
+  check_mode: false
+  register: rabbitmq_hostnames
+  with_items: "{{ groups['rabbitmq'] }}"
+
+- name: Check if each rabbit hostname resolves uniquely to the proper IP address
+  fail:
+    msg: Hostname has to resolve uniquely to the IP address of api_interface
+  with_subelements:
+    - "{{ rabbitmq_hostnames.results }}"
+    - stdout_lines
+  when:
+    - not item.1 is match('^'+('api' | kolla_address(item.0.item))+'\\b')
+
+- name: Check if TLS certificate exists for RabbitMQ
+  vars:
+    cert: "{{ query('first_found', paths, errors='ignore') }}"
+    paths:
+      - "{{ kolla_certificates_dir }}/{{ inventory_hostname }}/rabbitmq-cert.pem"
+      - "{{ kolla_certificates_dir }}/{{ inventory_hostname }}-cert.pem"
+      - "{{ kolla_certificates_dir }}/rabbitmq-cert.pem"
+  fail:
+    msg: No TLS certificate provided for RabbitMQ.
+  when:
+    - rabbitmq_enable_tls | bool
+    - cert | length == 0
+
+- name: Check if TLS key exists for RabbitMQ
+  vars:
+    key: "{{ query('first_found', paths, errors='ignore') }}"
+    paths:
+      - "{{ kolla_certificates_dir }}/{{ inventory_hostname }}/rabbitmq-key.pem"
+      - "{{ kolla_certificates_dir }}/{{ inventory_hostname }}-key.pem"
+      - "{{ kolla_certificates_dir }}/rabbitmq-key.pem"
+  fail:
+    msg: No TLS key provided for RabbitMQ.
+  when:
+    - rabbitmq_enable_tls | bool
+    - key | length == 0

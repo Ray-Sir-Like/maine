@@ -1,0 +1,15 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Backup MariaDB
+  hosts: mariadb
+  vars:
+    kolla_action: "{{ maine_action }}"
+  roles:
+    - { role: mariadb,
+        tags: mariadb,
+        when: enable_mariabackup | bool and not enable_hacluster | bool }
+
+    - { role: pcs-mariadb,
+        tags: mariadb,
+        when: enable_mariabackup | bool and enable_hacluster | bool }

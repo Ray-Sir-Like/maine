@@ -1,0 +1,52 @@
+---
+version: '2.0'
+
+share_time_snapshot:
+  type: direct
+  description: |
+      This workflow to make snapshots of shares.
+  input:
+    - share
+    - pattern: "{0}_time_snapshot_{1}"
+    - zaqar_queue_name: ""
+    - send_on_success: false
+    - send_on_error: false
+    - max_snapshots: 5
+    - action_region: "RegionOne"
+
+  tasks:
+    share_snapshot:
+      action: mistral_plugin.share_snapshots_create
+      input:
+        share: <% $.share %>
+        force: true
+        max_snapshots: <% $.max_snapshots %>
+        action_region: <% $.action_region %>
+      publish:
+        s_snap_id: <% task(share_snapshot).result.id %>
+      on-success:
+        - success_task: <% $.send_on_success %>
+      on-error:
+        - error_task: <% $.send_on_error %>
+
+    success_task:
+      description: 'Feedback the successful results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Snapshot for share <% $.share %> has been created"
+            snapshot_id: <% $.s_snap_id %>
+            status: "successed"
+
+    error_task:
+      description: 'Feedback the failed results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Failed to create a snapshot for share <% $.share %>"
+            snapshot_id: <% $.s_snap_id %>
+            status: "failed"

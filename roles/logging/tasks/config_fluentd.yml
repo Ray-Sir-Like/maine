@@ -1,0 +1,77 @@
+---
+- name: Find custom fluentd input config files
+  find:
+    path: "{{ node_custom_config }}/logging-fluentd/input"
+    pattern: "*.conf"
+  run_once: True
+  register: find_custom_fluentd_inputs
+  delegate_to: localhost
+
+- name: Find custom fluentd output config files
+  find:
+    path: "{{ node_custom_config }}/logging-fluentd/output"
+    pattern: "*.conf"
+  run_once: True
+  register: find_custom_fluentd_outputs
+  delegate_to: localhost
+
+- name: Find custom fluentd format config files
+  find:
+    path: "{{ node_custom_config }}/logging-fluentd/format"
+    pattern: "*.conf"
+  run_once: True
+  register: find_custom_fluentd_formats
+  delegate_to: localhost
+
+- name: Find custom fluentd filter config files
+  find:
+    path: "{{ node_custom_config }}/logging-fluentd/filter"
+    pattern: "*.conf"
+  run_once: True
+  register: find_custom_fluentd_filters
+  delegate_to: localhost
+
+- name: Copying over td-agent.conf
+  vars:
+    service_name: "logging-fluentd"
+    service: "{{ logging_services[service_name] }}"
+    log_direct_to_opensearch: "{{ not enable_monasca | bool }}"
+    fluentd_version: "{{ fluentd_labels.images.0.ContainerConfig.Labels.fluentd_version | default('0.12') }}"
+    fluentd_input_files: "{{ default_input_files | customise_fluentd(customised_input_files) }}"
+    default_input_files:
+      - "conf/input/00-global.conf.j2"
+      - "conf/input/01-syslog.conf.j2"
+      - "conf/input/02-mariadb.conf.j2"
+      - "conf/input/03-rabbitmq.conf.j2"
+      - "conf/input/04-openstack-wsgi.conf.j2"
+      - "conf/input/05-libvirt.conf.j2"
+      - "conf/input/06-zookeeper.conf.j2"
+      - "conf/input/07-kafka.conf.j2"
+      - "conf/input/09-monasca.conf.j2"
+    customised_input_files: "{{ find_custom_fluentd_inputs.files | map(attribute='path') | list }}"
+    fluentd_filter_files: "{{ default_filter_files | customise_fluentd(customised_filter_files) }}"
+    default_filter_files:
+      - "conf/filter/00-record_transformer.conf.j2"
+      - "conf/filter/01-rewrite.conf.j2"
+      - "conf/filter/02-parser.conf.j2"
+    customised_filter_files: "{{ find_custom_fluentd_filters.files | map(attribute='path') | list }}"
+    fluentd_format_files: "{{ default_format_files | customise_fluentd(customised_format_files) }}"
+    default_format_files:
+      - "conf/format/apache_access.conf.j2"
+      - "conf/format/wsgi_access.conf.j2"
+    customised_format_files: "{{ find_custom_fluentd_formats.files | map(attribute='path') | list }}"
+    fluentd_output_files: "{{ default_output_files_enabled | customise_fluentd(customised_output_files) }}"
+    default_output_files_enabled: "{{ default_output_files | selectattr('enabled') | map(attribute='name') | list }}"
+    default_output_files:
+      - name: "conf/output/00-local.conf.j2"
+        enabled: true
+      - name: "conf/output/03-opensearch.conf.j2"
+        enabled: "{{ log_direct_to_opensearch }}"
+    customised_output_files: "{{ find_custom_fluentd_outputs.files | map(attribute='path') | list }}"
+  template:
+    src: "td-agent.conf.j2"
+    dest: "{{ node_config_directory }}/logging-fluentd/td-agent.conf"
+    mode: "0660"
+  become: true
+  notify:
+    - Restart logging-fluentd container

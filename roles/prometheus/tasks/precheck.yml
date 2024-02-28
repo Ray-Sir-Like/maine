@@ -1,0 +1,43 @@
+---
+- name: Get container facts
+  become: true
+  kolla_container_facts:
+    name:
+      - prometheus_server
+      - prometheus_proxy
+      - prometheus_pushgateway
+  register: container_facts
+
+- name: Checking free port for Prometheus server
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ prometheus_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['prometheus_server'] is not defined
+    - inventory_hostname in groups['prometheus-server']
+
+- name: Checking free port for Prometheus pushgateway
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ prometheus_pushgateway_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['prometheus_pushgateway'] is not defined
+    - inventory_hostname in groups['prometheus-pushgateway']
+
+
+- name: Checking free port for Prometheus proxy
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ prometheus_proxy_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['prometheus_proxy'] is not defined
+    - inventory_hostname in groups['prometheus-proxy']

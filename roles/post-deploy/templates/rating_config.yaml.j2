@@ -1,0 +1,67 @@
+hashmap_services:
+{% for item in hashmap_services %}
+  - {{ item }}
+{% endfor %}
+
+service_mappings:
+{% for service, price in service_mappings.iteritems() %}
+  {{ service }}: {{ price }}
+{% endfor %}
+
+hashmap_fields:
+{% for service, fields in hashmap_fields.iteritems() %}
+  {{ service }}:
+{% for field in fields %}
+  - {{ field }}
+{% endfor %}
+{% endfor %}
+
+instance_flavor_name_mappings:
+{% for item in flavors %}
+  {{ item['name'] }}: {{ item['price'] }}
+{% endfor %}
+
+volume_size_volume_type_mappings:
+{% for type, price in volume_type_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+volume_snapshot_size_volume_type_mappings:
+{% for type, price in volume_type_snapshot_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+manila_share_size_share_type_mappings:
+{% for type, price in share_type_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+manila_share_snapshot_size_share_type_mappings:
+{% for type, price in share_type_snapshot_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+instance_subscription_mappings:
+{% for type, price in instance_subscription_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+volume_size_subscription_mappings:
+{% for type, price in volume_subscription_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+volume_snapshot_size_subscription_mappings:
+{% for type, price in volume_size_snapshot_subscription_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+manila_share_size_subscription_mappings:
+{% for type, price in manila_subscription_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}
+
+manila_share_snapshot_size_subscription_mappings:
+{% for type, price in manila_snapshot_subscription_mappings.iteritems() %}
+  {{ type }}: {{ price }}
+{% endfor %}

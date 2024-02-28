@@ -1,0 +1,19 @@
+---
+- name: Copy tools for enroll
+  copy:
+    src: enroll.py
+    dest: "{{ node_config_directory }}/bifrost/enroll.py"
+    mode: "0755"
+  become: true
+
+- name: Enrolling physical servers with ironic
+  command: >
+    docker exec bifrost_deploy
+    python /etc/bifrost/enroll.py
+  register: enroll_output
+  ignore_errors: yes
+
+- name: Output enroll task logs
+  debug:
+    msg: "{{ enroll_output.stderr_lines }}"
+  failed_when: enroll_output.rc != 0

@@ -1,0 +1,7 @@
+---
+- import_role:
+    name: service-ks-register
+  vars:
+    service_ks_register_auth: "{{ openstack_lulu_auth }}"
+    service_ks_register_services: "{{ lulu_ks_services }}"
+    service_ks_register_users: "{{ lulu_ks_users }}"

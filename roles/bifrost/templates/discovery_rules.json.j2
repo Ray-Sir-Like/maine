@@ -1,0 +1,88 @@
+[{% if ipmi_username is defined and ipmi_password is defined %}{
+    "description": "Set default IPMI credentials",
+    "conditions": [{"op": "eq", "field": "data://auto_discovered", "value": true}
+    ],
+    "actions": [
+        {"action": "set-attribute", "path": "driver_info/ipmi_username",
+         "value": "{{ ipmi_username }}"},
+        {"action": "set-attribute", "path": "driver_info/ipmi_password",
+         "value": "{{ ipmi_password }}"}
+    ],
+    "uuid": "b2750261-d567-4d97-bcfb-bc09e9e0fdfc"
+},{% endif %}{% if ipa_kernel_name is defined and ipa_initramfs_name is defined %} {
+    "description": "Set deploy info if not already set on node for x86_64 server",
+    "actions": [
+        {"action": "set-attribute", "path": "driver_info/deploy_kernel",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ipa_kernel_name }}"},
+        {"action": "set-attribute", "path": "driver_info/deploy_ramdisk",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ipa_initramfs_name }}"}
+    ],
+    "conditions": [
+        {"op": "is-empty", "field": "node://driver_info.deploy_ramdisk"},
+        {"op": "is-empty", "field": "node://driver_info.deploy_kernel"},
+        {"op": "eq", "field": "data://cpu_arch", "value": "x86_64"}
+    ],
+    "uuid": "9baed377-8e61-494f-9552-91148ad28ae2"
+},{% endif %}{% if ipa_aarch64_kernel_name is defined and ipa_aarch64_initramfs_name is defined %}{
+    "description": "Set deploy info if not already set on node for aarch64 server",
+    "actions": [
+        {"action": "set-attribute", "path": "driver_info/deploy_kernel",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ipa_aarch64_kernel_name }}"},
+        {"action": "set-attribute", "path": "driver_info/deploy_ramdisk",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ipa_aarch64_initramfs_name }}"}
+    ],
+    "conditions": [
+        {"op": "is-empty", "field": "node://driver_info.deploy_ramdisk"},
+        {"op": "is-empty", "field": "node://driver_info.deploy_kernel"},
+        {"op": "eq", "field": "data://cpu_arch", "value": "aarch64"}
+    ],
+    "uuid": "81b93d51-d346-46e2-817e-4d22f2fd614d"
+},{% endif %}{% if ironic_user_image_name is defined %}{
+    "description": "Set deploy image info if not already set on node for x86_64 server",
+    "actions": [
+        {"action": "set-attribute", "path": "instance_info/image_source",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ironic_user_image_name }}"},
+        {"action": "set-attribute", "path": "instance_info/image_checksum",
+         "value": "{{ ironic_user_image_checksum }}"}
+    ],
+    "conditions": [
+        {"op": "is-empty", "field": "node://instance_info.image_source"},
+        {"op": "is-empty", "field": "node://instance_info.image_checksum"},
+        {"op": "eq", "field": "data://cpu_arch", "value": "x86_64"}
+    ],
+    "uuid": "30353073-102d-48de-9239-7279ed00be84"
+},{% endif %}{% if ironic_aarch64_user_image_name is defined %}{
+    "description": "Set deploy image info if not already set on node for aarch64 server",
+    "actions": [
+        {"action": "set-attribute", "path": "instance_info/image_source",
+         "value": "http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:{{ file_url_port }}/{{ ironic_aarch64_user_image_name }}"},
+        {"action": "set-attribute", "path": "instance_info/image_checksum",
+         "value": "{{ ironic_aarch64_user_image_checksum }}"}
+    ],
+    "conditions": [
+        {"op": "is-empty", "field": "node://instance_info.image_source"},
+        {"op": "is-empty", "field": "node://instance_info.image_checksum"},
+        {"op": "eq", "field": "data://cpu_arch", "value": "aarch64"}
+    ],
+    "uuid": "22efe9cf-0539-45fb-8def-87f4aee1b713"
+},{% endif %}{
+   "description": "Set boot mode to UEFI when UEFI is enabled",
+   "conditions": [
+       {"op": "eq", "field": "data://inventory.boot.current_boot_mode", "value": "uefi"}
+   ],
+   "actions": [
+        {"action": "set-capability", "name": "boot_mode", "value": "uefi"},
+        {"action": "set-capability", "name": "boot_option", "value": "local"}
+   ],
+   "uuid": "419f30e1-488d-46b4-90d1-830b60e8b7a2"
+},{
+   "description": "Set boot mode to Legacy when UEFI is not enabled",
+   "conditions": [
+       {"op": "ne", "field": "data://inventory.boot.current_boot_mode", "value": "uefi"}
+   ],
+   "actions": [
+        {"action": "set-capability", "name": "boot_mode", "value": "bios"},
+        {"action": "set-capability", "name": "boot_option", "value": "local"}
+   ],
+   "uuid": "25676fef-b128-418d-9d6d-579760fb230d"
+}]

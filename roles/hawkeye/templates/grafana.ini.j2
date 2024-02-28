@@ -1,0 +1,56 @@
+[paths]
+data = /grafana
+logs = /var/log/kolla/hawkeye
+plugins = /var/lib/grafana/plugins
+provisioning = /opt/grafana/conf/provisioning
+
+[server]
+protocol = http
+http_addr = {{ monitoring_interface_address }}
+http_port = {{ hawkeye_grafana_port }}
+
+router_logging = true
+
+static_root_path = public
+enable_gzip = false
+
+[metrics]
+enabled = true
+
+[database]
+type = mysql
+host = {{ grafana_database_address }}
+name = {{ grafana_database_name }}
+user = {{ grafana_database_user }}
+password = {{ grafana_database_password }}
+ssl_mode = disable
+
+[session]
+provider = mysql
+provider_config = {{ grafana_database_user }}:{{ grafana_database_password }}@tcp({{ grafana_database_address }})/{{ grafana_database_name }}
+
+cookie_name = grafana_sess
+cookie_secure = false
+session_life_time = 86400
+
+[alerting]
+enabled = false
+
+[analytics]
+reporting_enabled = false
+check_for_updates = false
+
+[users]
+default_theme = {{ grafana_default_theme }}
+
+#################################### Anonymous Auth ##########################
+[auth.anonymous]
+# enable anonymous access
+enabled = {{ grafana_auth_anonymous_enabled | bool }}
+org_name = Main Org.
+org_role = Viewer
+
+[security]
+admin_user = {{ grafana_admin_username }}
+admin_password = {{ grafana_admin_password }}
+allow_embedding = {{ grafana_allow_embedding }}

@@ -1,0 +1,22 @@
+{
+{% if inventory_hostname in groups['consul_server'] %}
+    "bootstrap_expect": {{ groups['consul_server'] | length }},
+    "server": true,
+    "ui": true,
+{% endif %}
+    "leave_on_terminate": {{ consul_leave_on_terminate | lower }},
+    "datacenter": "{{ hawkeye_region_name }}",
+    "data_dir": "/consul/data",
+    "log_level": "INFO",
+    "node_name": "{{ ansible_hostname }}",
+    "bind_addr": "{{ monitoring_interface_address }}",
+    "ports": {
+      "http": {{ hawkeye_consul_port }}
+    },
+    "telemetry": {
+      "prometheus_retention_time": "744h",
+      "disable_hostname": true
+    },
+    "client_addr": "{{ monitoring_interface_address }}",
+    "retry_join": [{% for host in groups['consul_server'] %}"{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}"{% if not loop.last %},{% endif %}{% endfor %}]
+}

@@ -1,0 +1,408 @@
+---
+- name: Configure iptables rules
+  hosts: all
+  handlers:
+    - name: Persistent rules save
+      shell: "{{ item }}-save > /etc/sysconfig/{{ item }}"
+      loop:
+        - iptables
+        - ip6tables
+      notify:
+        - Nonpersistent rules cleanup
+
+    - name: Nonpersistent rules cleanup
+      lineinfile:
+        path: "{{ item[0] }}"
+        regexp: "{{ item[1] }}"
+        state: absent
+      loop: "{{ ['/etc/sysconfig/iptables', '/etc/sysconfig/ip6tables'] | product(['neutron-', 'ironic-inspector']) | list }}"
+  tasks:
+    - name: Ensure iptables is installed
+      package:
+        name: iptables-services
+        state: present
+
+    - name: Ensure iptables is started and enabled
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - "iptables"
+        - "ip6tables"
+
+    - name: Check user-defined chain state for v4 and v6
+      shell: "{{ item }} -nL | grep -q {{ iptables_chain }}"
+      failed_when: false
+      register: user_chain_state
+      loop:
+        - iptables
+        - ip6tables
+
+    - block:
+        - name: Delete INPUT chain jump of user-defined
+          iptables:
+            chain: INPUT
+            ip_version: "{{ item }}"
+            state: absent
+            jump: "{{ iptables_chain }}"
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+
+        - name: Delete v4 user-defined chain
+          shell: "iptables -F {{ iptables_chain }} && iptables -X {{ iptables_chain }}"
+          when: user_chain_state['results'][0]['rc'] == 0
+          notify:
+            - Persistent rules save
+
+        - name: Delete v6 user-defined chain
+          shell: "ip6tables -F {{ iptables_chain }} && ip6tables -X {{ iptables_chain }}"
+          when: user_chain_state['results'][1]['rc'] == 0
+          notify:
+            - Persistent rules save
+      when: not configure_iptables | bool
+
+    - block:
+        - name: Create v4 user-defined chain
+          command: "iptables -N {{ iptables_chain }}"
+          when: user_chain_state['results'][0]['rc'] != 0
+          notify:
+            - Persistent rules save
+
+        - name: Create v6 user-defined chain
+          command: "ip6tables -N {{ iptables_chain }}"
+          when: user_chain_state['results'][1]['rc'] != 0
+          notify:
+            - Persistent rules save
+
+        - name: Make INPUT chain jump to user-defined chain first
+          iptables:
+            chain: INPUT
+            ip_version: "{{ item }}"
+            action: insert
+            jump: "{{ iptables_chain }}"
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+      when: configure_iptables | bool
+
+    - block:
+        - name: Allow related and established connections
+          iptables:
+            chain: "INPUT"
+            ctstate: ESTABLISHED,RELATED
+            ip_version: "{{ item }}"
+            state: present
+            jump: ACCEPT
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+
+        - name: Accept baremetal ipv4 icmp protocol
+          iptables:
+            chain: "INPUT"
+            protocol: icmp
+            ip_version: "ipv4"
+            state: present
+            jump: ACCEPT
+          notify:
+            - Persistent rules save
+
+        - name: Accept baremetal ipv6 icmp protocol
+          iptables:
+            chain: "INPUT"
+            protocol: ipv6-icmp
+            ip_version: "ipv6"
+            state: present
+            jump: ACCEPT
+          notify:
+            - Persistent rules save
+
+        - name: Accept lo interface
+          iptables:
+            chain: "INPUT"
+            in_interface: "lo"
+            state: present
+            ip_version: "{{ item }}"
+            jump: ACCEPT
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+
+        - name: Accept ssh
+          iptables:
+            chain: "INPUT"
+            protocol: tcp
+            destination_port: "22"
+            ip_version: "{{ item }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+
+        - name: Accept ipv6 fe80::/64
+          iptables:
+            chain: "INPUT"
+            protocol: udp
+            destination: fe80::/64
+            destination_port: "546"
+            ip_version: "ipv6"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          notify:
+            - Persistent rules save
+
+        - name: Reject ipv4 with icmp-host-prohibited
+          iptables:
+            chain: "{{ item }}"
+            ip_version: "ipv4"
+            reject_with: icmp-host-prohibited
+          loop:
+            - "INPUT"
+            - "FORWARD"
+          notify:
+            - Persistent rules save
+
+        - name: Reject ipv6 with icmp6-adm-prohibited
+          iptables:
+            chain: "{{ item }}"
+            ip_version: "ipv6"
+            reject_with: icmp6-adm-prohibited
+          loop:
+            - "INPUT"
+            - "FORWARD"
+          notify:
+            - Persistent rules save
+
+      tags: all
+      when:
+        - configure_iptables | bool
+
+    - block:
+        - name: Accept specified network segment
+          iptables:
+            chain: "{{ iptables_chain }}"
+            source: "{{ item }}"
+            destination: "{{ item }}"
+            jump: ACCEPT
+          loop: "{{ baremetal_accept_cidrs | join(' ')).split() }}"
+          notify:
+            - Persistent rules save
+      tags: baremetal
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['baremetal']
+
+    - block:
+        - name: Accept baremetal tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (baremetal_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+
+        - name: Accept baremetal udp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: udp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (baremetal_udp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+
+      tags: baremetal
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['baremetal']
+
+    - block:
+        - name: Accept seed tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (seed_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+
+        - name: Accept seed udp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: udp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (seed_udp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+      tags: seed
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['deployment']
+
+    - block:
+        - name: Accept control tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (control_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+
+        - name: Accept control vrrp protocol
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: vrrp
+            ip_version: "{{ item }}"
+            state: present
+            jump: ACCEPT
+          loop:
+            - ipv4
+            - ipv6
+          notify:
+            - Persistent rules save
+      tags: control
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['control']
+
+    - block:
+        - name: Allow specified node access memcached_port
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            source: "{{ api_interface_address }}"
+            destination_port: "{{ memcached_port }}"
+            state: present
+            jump: ACCEPT
+          loop: "{{ groups['control'] }}"
+          when: hostvars[item]['ansible_'+hostvars[item]['api_interface']] is defined
+          notify:
+            - Persistent rules save
+      tags: control
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['control']
+
+    - block:
+        - name: Accept compute tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (compute_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+      tags: compute
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['compute']
+
+    - block:
+        - name: Accept ceph mon tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (ceph_mon_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+          when:
+            - inventory_hostname in groups['mons']
+
+        - name: Accept ceph osd tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (ceph_osd_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+          when:
+            - inventory_hostname in groups['osds']
+      tags: ceph
+      when:
+        - configure_iptables | bool
+
+    - block:
+        - name: Accept hawkeye tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (hawkeye_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+      tags: hawkeye
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['baremetal']
+
+    - block:
+        - name: Accept logging tcp ports
+          iptables:
+            chain: "{{ iptables_chain }}"
+            protocol: tcp
+            destination_port: "{{ item[0] }}"
+            ip_version: "{{ item[1] }}"
+            state: present
+            ctstate: NEW
+            jump: ACCEPT
+          loop: "{{ (logging_tcp_accept_ports | join(' ')).split() | product(['ipv4', 'ipv6']) | list }}"
+          notify:
+            - Persistent rules save
+      tags: logging
+      when:
+        - configure_iptables | bool
+        - inventory_hostname in groups['baremetal']

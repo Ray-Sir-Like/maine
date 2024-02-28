@@ -1,0 +1,8 @@
+---
+- name: Remove lulu container instances
+  become: true
+  docker_container:
+    name: "{{ item.value.container_name }}"
+    state: absent
+  with_dict: "{{ lulu_services }}"
+  tags: lulu

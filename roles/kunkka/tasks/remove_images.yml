@@ -1,0 +1,9 @@
+---
+- name: Removing kunkka images
+  become: true
+  docker_image:
+    name: "{{ item.value.image }}"
+    state: absent
+    force: yes
+  with_dict: "{{ kunkka_services }}"
+  tags: kunkka

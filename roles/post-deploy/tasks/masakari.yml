@@ -1,0 +1,10 @@
+---
+- name: Ensure python masakariclient
+  package:
+    name: "{{ masakariclient }}"
+    state: present
+  ignore_errors: "{{ ansible_distribution == 'openEuler' }}"
+  tags:
+    - masakari
+  when:
+    - with_os_client | bool

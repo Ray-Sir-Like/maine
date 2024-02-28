@@ -1,0 +1,322 @@
+---
+################
+# Release
+################
+# Docker image tag used by default.
+#openstack_release: null
+# Suffix applied to openstack_release to generate openstack_tag.
+#openstack_tag_suffix: "{{ '-oe2203' if ansible_distribution == 'openEuler' else  '-c8s' }}"
+
+# Docker image tag used by ceph.
+#ceph_release: null
+# Use to skip creating osd daemon automatically. setting to True especially for seperated db/wal device or open-cas scenario
+#skip_add_osd_daemon: false
+
+################
+# Seed Network
+################
+# Repository IP --> {{ seed_interface_address }}:{{ docker_registry_port }}
+# Registry IP --> {{ seed_interface_address }}:{{ repo_port }}
+# Bifrost PXE Interface
+#seed_interface: null
+
+##########################
+# Network Checking options
+##########################
+#ping_count: 10
+#ping_interval: 0.2
+#ping_allowed_avg: 0.200
+#ping_allowed_max: 0.500
+#ping_allowed_loss: 0.0
+
+################
+# Chrony options
+################
+# A list contains ntp servers
+#external_ntp_servers:
+#  - 0.pool.ntp.org
+#  - 1.pool.ntp.org
+#  - 2.pool.ntp.org
+#  - 3.pool.ntp.org
+
+####################
+# Networking Options
+####################
+# Used by hawkeye
+#monitoring_interface: "{{ api_interface }}"
+# Used by nova live migration
+#migration_interface: "{{ api_interface }}"
+
+#############################
+# UStack options optimization
+#############################
+# Disable optimization vars overwrite when it is need to self-controlled
+#enable_optimization: "yes"
+
+######################
+# UStack infra options
+######################
+# Ustack infra services can be enabled or disabled with these options
+#enable_logging: "no"
+
+########################
+# UStack service options
+########################
+# Ustack services can be enabled or disabled with these options
+#enable_goering: "no"
+#enable_kunkka: "yes"
+#enable_ryze: "no"
+#enable_lulu: "no"
+#enable_malphite: "no"
+#enable_masakari: "no"
+#enable_neutron_uplugin_agent: "yes"
+#enable_porsche: "no"
+#enable_shadowfiend: "no"
+#enable_zaqar: "no"
+#enable_s3: "no"
+
+#######################
+# Masakari options
+#######################
+# choices: stonith, bifrost
+#masakari_monitors_power_off_driver: "stonith"
+
+###########################
+## Audit OpenStack resource
+############################
+#enable_audit: "no"
+
+####################
+# Kunkka options
+####################
+#kunkka_port: "80"
+#kunkka_tls_port: "443"
+#kunkka_admin_port: "5677"
+#kunkka_console_port: "5678"
+#kunkka_message_port: "5679"
+
+#kunkka_database_address: "{{ database_address }}"
+#kunkka_database_admin_user: "{{ database_user }}"
+#kunkka_database_port: "{{ database_port }}"
+#kunkka_database_user: "kunkka"
+#kunkka_database_name: "kunkka"
+
+#enable_kunkka_external_redis: false
+#kunkka_external_redis_host:
+#kunkka_external_redis_port:
+#kunkka_external_redis_password:
+#kunkka_redis_db: 3
+
+#sso_providers:
+#  - provider: 'tfcloud-idp'
+#    protocal: 'saml2'
+#    title: '同方有云统一认证平台'
+#    default: true
+#  - provider: 'huaweicloud-idp'
+#    protocal: 'saml2'
+#    title: '华为云认证中心'
+#    default: false
+
+#kunkka_urls:
+#  undercloud_prometheus:
+#    url: '{{ public_protocol }}://{{ kolla_external_fqdn }}:{{ hawkeye_prometheus_port }}'
+#    username: '{{ prometheus_user }}'
+#    password: '{{ prometheus_password }}'
+#  overcloud_prometheus:
+#    url: '{{ public_protocol }}://{{ kolla_external_fqdn }}:{{ prometheus_port }}'
+#    username: '{{ prometheus_user }}'
+#    password: '{{ prometheus_password }}'
+#  undercloud_grafana:
+#    url: '{{ public_protocol }}://{{ kolla_external_fqdn }}:{{ hawkeye_grafana_port }}'
+#    username: '{{ grafana_admin_username }}'
+#    password: '{{ grafana_admin_password }}'
+#  captain: "http://{{ bifrost_network_interface_address }}:{{ captain_port }}"
+#  admin_guide_doc: "http://{{ kolla_external_fqdn }}:5800/admin"
+#  user_guide_doc: "http://{{ kolla_external_fqdn }}:5800/user"
+
+# session expiration duration, in ms (default is 86400000, 1 day)
+#kunkka_session_max_age: 86400000
+#kunkka_session_renew: "no"
+
+# Default option is 'physnet1:1:1000', please change the option as your environment.
+#neutron_network_vlan_ranges: "physnet1:1:1000"
+#neutron_physical_network_mtus: " physnet1:1500"
+
+# Default options for kunkka ticket service
+#kunkka_ticket_enabled: "no"
+# s3 or swift
+#kunkka_ticket_storage_type: "s3"
+#kunkka_ticket_storage_region: "{{ openstack_region_name }}"
+#kunkka_ticket_storage_bucket: "ticket"
+
+#kunkka_admin_email: "example@unitedstack.com"
+#kunkka_pay:
+#  alipay:
+#    is_prod: true
+#    app_id: "example"
+#    app_private_key: "example"
+#    alipay_public_key: "example"
+#kunkka_logo:
+#  generic: "logo.png"
+#  navbar: "nav_logo.png"
+#  favicon: "favicon.ico"
+#  background: "auth-bg.png"
+#kunkka_email_logo: 'https://www.tfcloud.com/static/assets/logo1.png'
+#kunkka_login_online_limit: 5
+
+####################
+# Lulu options
+####################
+#lulu_port: "5700"
+
+####################
+# Ryze options
+####################
+#ryze_logo:
+#  generic: "logo.png"
+#  navbar: "nav_logo.png"
+#  favicon: "favicon.ico"
+#ryze_email_logo: 'https://www.tfcloud.com/static/assets/logo1.png'
+
+##################
+# Iptables options
+##################
+#configure_firewall: false
+#configure_iptables: true
+#iptables_chain: "ustack"
+#baremetal_tcp_accept_extra_ports: []
+#baremetal_udp_accept_extra_ports: []
+#baremetal_accept_extra_cidrs: []
+#seed_tcp_accept_extra_ports: []
+#seed_udp_accept_extra_ports: []
+#control_tcp_accept_extra_ports: []
+#compute_tcp_accept_extra_ports: []
+#hawkeye_tcp_accept_extra_ports: []
+
+#############################################
+# Bifrost install parameters
+#############################################
+# Ironic dhcp server network interface, and
+# not use network_interface.
+#bifrost_network_interface: "{{ seed_interface }}"
+
+#####################################
+# Introspection rule and image params
+#####################################
+# images for x86_64
+#ipa_kernel_name: ipa.kernel
+#ipa_initramfs_name: ipa.initramfs
+#ironic_user_image_name:
+#ironic_user_image_checksum:
+
+# images for aarch64; not support yet
+#ipa_aarch64_kernel_name: ipa-aarch64.kernel
+#ipa_aarch64_initramfs_name: ipa-aarch64.initramfs
+#ironic_aarch64_user_image_name:
+#ironic_aarch64_user_image_checksum:
+
+#####################
+# Zaqar options
+#####################
+## 邮件发送 smtp server
+## 注意：大部分 smtp server 通过 secure 方式链接，需要开启zaqar_smtp_secure
+#zaqar_smtp_hostname: ""
+#zaqar_smtp_port: 0
+#zaqar_smtp_username: ""
+#zaqar_smtp_password: ""
+#zaqar_smtp_secure: False
+#zaqar_smtp_sender: ""
+
+## 邮件模版
+## 依次分别为：公司名称，LOGO 地址，官网链接
+#zaqar_email_corperation_name: ""
+#zaqar_email_logo_url: ""
+#zaqar_email_home_link: ""
+
+#################
+# Nuntius options
+#################
+#enable_nuntius: "{{ enable_ryze | bool}}"
+#nuntius_use_db: False
+#
+# Telegram
+#enable_nuntius_telegram: False
+#nuntius_telegram_token: ""
+#nuntius_telegram_userid: "123456"
+#
+# 钉钉
+#enable_nuntius_dingtalk: False
+#nuntius_dingtalk_token: ""
+#nuntius_dingtalk_phone_numbers: []
+#nuntius_dingtalk_isatall: False
+#
+# Hl95
+#enable_nuntius_hl95: False
+#nuntius_hl95_username: "foo"
+#nuntius_hl95_password: "bar"
+#nuntius_hl95_epid: "666"
+#nuntius_hl95_title:
+#nuntius_hl95_phone_numbers: []
+#
+# Aliyun
+#enable_nuntius_aliyun: False
+#nuntius_aliyun_region_id: "123456"
+#nuntius_aliyun_access_key: "123456"
+#nuntius_aliyun_access_key_secret: "123456"
+#nuntius_aliyun_sign_name: "123456"
+#nuntius_aliyun_template_code: "123456"
+#nuntius_aliyun_template_param_key: "123456"
+#
+# Rsyslog
+#enable_nuntius_rsyslog: False
+#nuntius_rsyslog_address: "{{ syslog_server }}:{{ syslog_udp_port }}"
+#nuntius_rsyslog_appname: "nuntius"
+#nuntius_rsyslog_protocol: "udp"
+
+# Email
+#enable_nuntius_email: False
+#nuntius_email_smtpserver:
+#nuntius_email_smtpuser:
+#nuntius_email_smtppwd:
+#nuntius_email_sender:
+#nuntius_email_insecureskipverify: False
+
+########################
+# Monitoring - Hawkeye
+########################
+#enable_hawkeye: "yes"
+#
+# Grafana 权限
+#grafana_auth_anonymous_enabled: "yes"
+#
+# 监控设置
+#
+## 注意：这里 prometheus_scrape_timeout 必须小于 prometheus_scrape_interval 的值
+#prometheus_data_retention_day: 90
+#prometheus_scrape_interval: "15s"
+#prometheus_scrape_timeout: "15s"
+#prometheus_evaluation_interval: "15s"
+#
+# 告警设置
+#
+# 重新发送告警的周期
+#hawkeye_alarm_repeat_interval: 30m
+#
+# 邮件
+#enable_hawkeye_alertmanager_email: False
+#alertmanager_smtp_from: "foo@example.org"
+#alertmanager_smtp_smarthost: "smtp.example.org:465"
+#alertmanager_smtp_auth_username: "foo"
+#alertmanager_smtp_auth_password: "foo"
+#alertmanager_email_receiver: "bar@example.org"
+#alertmanager_smtp_require_tls: "false"
+#
+# 微信
+#enable_hawkeye_alertmanager_wechat: False
+#wechat_to_party:
+#  - 1
+#  - 2
+#wechat_agent_id: 123456
+#wechat_corp_id: ""
+#wechat_api_url: "https://qyapi.weixin.qq.com/cgi-bin/"
+#wechat_api_secret: ""

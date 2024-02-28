@@ -1,0 +1,24 @@
+{
+    "command": "/usr/bin/neutron-uplugin-agent --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/neutron-uplugin-agent.conf",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/neutron.conf",
+            "dest": "/etc/neutron/neutron.conf",
+            "owner": "neutron",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/neutron-uplugin-agent.conf",
+            "dest": "/etc/neutron/neutron-uplugin-agent.conf",
+            "owner": "neutron",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/neutron",
+            "owner": "neutron:neutron",
+            "recurse": true
+        }
+    ]
+}

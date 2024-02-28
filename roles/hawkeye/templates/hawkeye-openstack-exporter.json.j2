@@ -1,0 +1,18 @@
+{
+    "command": "/opt/openstack-exporter/openstack-exporter --os-client-config=/etc/openstack/clouds.yml --web.listen-address={{ monitoring_interface_address }}:{{ hawkeye_openstack_exporter_port }} --log.level=error --disable-slow-metrics --disable-deprecated-metrics {% for service in disabled_services %} --{{ service }}{% endfor %} {% for metric in disabled_metrics %} --disable-metric {{ metric }}{% endfor %} default",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/clouds.yml",
+            "dest": "/etc/openstack/clouds.yml",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/data",
+            "owner": "root:kolla",
+            "recurse": true
+        }
+    ]
+}

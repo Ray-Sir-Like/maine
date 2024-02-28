@@ -1,0 +1,16 @@
+---
+- name: Restart haproxy container
+  become: true
+  kolla_docker:
+    action: "restart_container"
+    name: haproxy
+  when:
+    - inventory_hostname in groups['haproxy']
+    - enable_haproxy | bool
+  notify:
+    - Waiting for haproxy to start
+
+- name: Waiting for haproxy to start
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ haproxy_stats_port }}"

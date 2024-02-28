@@ -1,0 +1,150 @@
+---
+- name: Preparation
+  hosts:
+    - all
+    - localhost
+  gather_facts: false
+  tasks:
+    - name: Gather facts
+      setup:
+
+    - name: Ensure the policy to ACCEPT for the INPUT chain
+      iptables:
+        chain: FORWARD
+        policy: ACCEPT
+      become: true
+
+    - name: Ensure package firewalld is absent
+      package:
+        name: firewalld
+        state: absent
+      register: firewalld_uninstall_state
+      when:
+        - inventory_hostname == 'localhost'
+
+    - name: Ensure libvirtd is restarted
+      service:
+        name: libvirtd
+        state: restarted
+      when:
+        - inventory_hostname == 'localhost'
+        - firewalld_uninstall_state is changed
+
+- name: Get vars from seed
+  hosts:
+    - seed
+  gather_facts: false
+  tasks:
+    - name: Get vip address
+      slurp:
+        src: /etc/maine/kolla-extra-globals.yml
+      register: kolla_extra_vars
+
+    - set_fact:
+        vip_address: "{{ (kolla_extra_vars['content'] | b64decode | regex_search('kolla_external_vip_address: \".*\"')).split('\"')[1] }}"
+        rgw_vip_address: "{{ (kolla_extra_vars['content'] | b64decode | regex_search('ceph_rgw_external_vip_address: \".*\"')).split('\"')[1] }}"
+
+- name: Portforwarding for vip address
+  hosts:
+    - seed
+    - localhost
+  vars:
+    kolla_enable_tls_external: "no"
+    ports: "{{ default_ports + extra_ports }}"
+    default_ports:
+      - from: "80"
+        to: "80"
+      - from: "443"
+        to: "443"
+      - from: "35357"
+        to: "35357"
+      - from: "5000:8079"
+        to: "5000:8079"
+      - from: "8080"
+        to: "8080"
+        vip_address: "rgw_vip_address"
+      - from: "8081:20000"
+        to: "8081:20000"
+    extra_ports: []
+    interfaces:
+      - virbr0
+      - virbr1
+      - virbr2
+  vars_files:
+    - "../etc/maine/group_vars/maine_all.yml"
+  gather_facts: false
+  tasks:
+    - name: Address masquerading
+      iptables:
+        state: present
+        table: nat
+        action: insert
+        chain: POSTROUTING
+        jump: MASQUERADE
+      become: true
+
+    - name: Add DNAT port forwarding from the seed to the vip_address
+      iptables:
+        state: present
+        table: nat
+        action: insert
+        chain: PREROUTING
+        protocol: tcp
+        match: tcp
+        jump: DNAT
+        destination: "{{ ansible_default_ipv4.address }}"
+        destination_port: "{{ item.from }}"
+        to_destination: "{{ hostvars['seed'][item.vip_address | default('vip_address')] }}"
+      loop: "{{ ports }}"
+      become: true
+      when: inventory_hostname != 'localhost'
+
+    - name: Add DNAT port forwarding from the localhost to the seed
+      iptables:
+        state: present
+        table: nat
+        action: insert
+        chain: PREROUTING
+        protocol: tcp
+        match: tcp
+        jump: DNAT
+        destination: "{{ hostvars['localhost']['ansible_default_ipv4']['address'] }}"
+        destination_port: "{{ item.from }}"
+        to_destination: "{{ hostvars['seed']['ansible_default_ipv4']['address'] }}"
+      loop: "{{ ports }}"
+      become: true
+      when: inventory_hostname == 'localhost'
+
+    - name: Access FORWARD chain for localhost
+      iptables:
+        state: present
+        action: insert
+        chain: FORWARD
+        jump: ACCEPT
+      become: true
+
+    - name: Remove REJECT rule on FORWARD chain for localhost(in interface)
+      iptables:
+        state: absent
+        chain: FORWARD
+        in_interface: "{{ item }}"
+        jump: REJECT
+      loop: "{{ interfaces }}"
+      ignore_errors: yes
+      become: true
+
+    - name: Remove REJECT rule on FORWARD chain for localhost(out interface)
+      iptables:
+        state: absent
+        chain: FORWARD
+        out_interface: "{{ item }}"
+        jump: REJECT
+      loop: "{{ interfaces }}"
+      ignore_errors: yes
+      become: true
+
+    - name: Set ip forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes

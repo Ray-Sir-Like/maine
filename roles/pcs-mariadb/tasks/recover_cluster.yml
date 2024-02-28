@@ -1,0 +1,10 @@
+---
+- name: Cleanup mariadb pacemaker resource
+  command: >
+    docker exec hacluster_pacemaker pcs resource cleanup mariadb-bundle
+  run_once: True
+
+- name: Cleanup mariadb clustercheck pacemaker resource
+  command: >
+    docker exec hacluster_pacemaker pcs resource cleanup mariadb-clustercheck-bundle
+  run_once: True

@@ -1,0 +1,372 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: set network fact vars
+  hosts:
+    - ceph
+  become: true
+  gather_facts: false
+  vars:
+    network_cidr: "{{ 'network' | kolla_address }}/{{ hostvars[inventory_hostname]['ansible_' + network_interface | replace('-', '_')]['ipv4']['netmask']}}"
+    storage_cidr: "{{ 'storage' | kolla_address }}/{{ hostvars[inventory_hostname]['ansible_' + storage_interface | replace('-', '_')]['ipv4']['netmask']}}"
+    storage_mgmt_cidr: "{{ 'storage_mgmt' | kolla_address }}/{{ hostvars[inventory_hostname]['ansible_' + storage_mgmt_interface | replace('-', '_')]['ipv4']['netmask']}}"
+  tasks:
+    - name: set fact vars
+      set_fact:
+        network_cidr: "{{ network_cidr | ipaddr('network/prefix') }}"
+        storage_cidr: "{{ storage_cidr | ipaddr('network/prefix') }}"
+        storage_mgmt_cidr: "{{ storage_mgmt_cidr | ipaddr('network/prefix') }}"
+
+- name: bootstrap seed
+  hosts: deployment
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Determine if missing an SSH key
+      stat: path=/root/.ssh/id_rsa
+      register: ceph_ssh_private_key_path
+
+    - name: Create an SSH key
+      shell: ssh-keygen -f /root/.ssh/id_rsa -N ""
+      when: >
+        ceph_ssh_private_key_path.stat.exists |bool  == false
+
+    - name: Update SSH pubkey
+      shell: ssh-keygen -y -f /root/.ssh/id_rsa > /root/.ssh/id_rsa.pub
+
+- name: bootstrap the cluster
+  hosts:
+    - ceph[0]
+  become: true
+  gather_facts: false
+  vars:
+    dashboard_admin_user: admin
+    dashboard_admin_password: p@ssw0rd
+  tasks:
+    # Note(Yao Ning): Use dnf, cephadm weak dependents on podman, should disable weak_deps
+    - name: ensure cephadm installed
+      dnf:
+        name: cephadm
+        install_weak_deps: no
+        state: present
+
+    - name: create ssh-key directory
+      file:
+        path: /etc/ceph/.ssh
+        state: directory
+
+    - name: copy ssh-key to ceph directory
+      copy:
+        src: "{{ item }}"
+        dest: /etc/ceph/.ssh
+      with_items:
+        - "/root/.ssh/id_rsa"
+        - "/root/.ssh/id_rsa.pub"
+
+    - name: check ceph cluster already bootstrap
+      stat:
+        path: "/etc/ceph/ceph.conf"
+      register: ceph_cluster_existed
+
+    - name: bootstrap initial cluster
+      command: >
+        cephadm --docker --image {{ docker_registry }}/{{ ceph_docker_namespace }}/udscore:{{ ceph_release }} bootstrap
+        --initial-dashboard-user {{ dashboard_admin_user }}
+        --initial-dashboard-password {{ dashboard_admin_password }}
+        --ssh-private-key /etc/ceph/.ssh/id_rsa
+        --ssh-public-key /etc/ceph/.ssh/id_rsa.pub
+        --cluster-network {{ storage_mgmt_cidr }}
+        --mon-ip {{ storage_interface_address }}
+        --skip-monitoring-stack
+      when:
+        - not ceph_cluster_existed.stat.exists | bool
+
+- name: add more hosts
+  hosts: ceph
+  become: true
+  gather_facts: false
+  tasks:
+    - name: ensure lvm2 installed
+      package:
+        name: lvm2
+        state: present
+
+    - name: add hosts to the cluster
+      ceph_orch_host:
+        name: "{{ inventory_hostname }}"
+        address: "{{ storage_mgmt_interface_address }}"
+        labels: "{{ labels }}"
+      delegate_to: "{{ groups['ceph'][0] }}"
+
+- name: config ceph log file
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: set ceph log file
+      shell: |
+        cephadm shell ceph config set global log_to_stderr false
+        cephadm shell ceph config set global log_to_file true
+        cephadm shell ceph config set global log_file '/var/log/ceph/$cluster-$type.$id.log'
+        cephadm shell ceph config set global mon_cluster_log_to_stderr false
+        cephadm shell ceph config set global mon_cluster_log_to_file true
+        cephadm shell ceph config set global mon_cluster_log_file '/var/log/ceph/$cluster.log'
+
+- name: deploy mon and osd service
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: scaling mon service
+      ceph_orch_apply:
+        spec: |
+          service_type: mon
+          service_id: mon
+          placement:
+            label: mon
+
+    - name: scaling mgr service
+      ceph_orch_apply:
+        spec: |
+          service_type: mgr
+          service_id: mgr
+          placement:
+            label: mgr
+
+    - name: apply osd spec
+      ceph_orch_apply:
+        spec: |
+          service_type: osd
+          service_id: osd
+          placement:
+            label: osd
+          spec:
+            data_devices:
+              all: true
+      when:
+        - not skip_add_osd_daemon | bool
+
+    - name: Setting balancer deviation
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/balancer/upmap_max_deviation
+        value: 1
+
+    - name: Autotune osd memory usage
+      block:
+        - name: tuned osd node memory ratio
+          ceph_config:
+            action: set
+            who: mgr
+            option: mgr/cephadm/autotune_memory_target_ratio
+            value: "{{ osd_memory_target_ratio }}"
+
+        - name: enable osd node memory autotune
+          ceph_config:
+            action: set
+            who: osd
+            option: osd_memory_target_autotune
+            value: 'true'
+      when:
+        - osd_memory_target_ratio is defined
+
+    - name: Persistent osd memory usage
+      block:
+        - name: disable osd node memory autotune
+          ceph_config:
+            action: set
+            who: osd
+            option: osd_memory_target_autotune
+            value: 'false'
+
+        - name: tuned osd node memory
+          ceph_config:
+            action: set
+            who: osd
+            option: osd_memory_target
+            value: "{{ osd_memory_target }}"
+      when:
+        - osd_memory_target_ratio is not defined
+
+- name: deploy monitoring service
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: set prometheus image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_prometheus
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/prometheus:{{ ceph_release }}"
+
+    - name: set alertmanager image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_alertmanager
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/alertmanager:{{ ceph_release }}"
+
+    - name: set node_exporter image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_node_exporter
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/node-exporter:{{ ceph_release }}"
+
+    - name: set grafana image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_grafana
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/grafana:{{ ceph_release }}"
+
+    # FIXME(Yao Ning): retention_time is supported in 16.2.11
+    # FIXME(Yao Ning): retention_size is supported in 18.2.0
+    - name: apply prometheus spec
+      ceph_orch_apply:
+        spec: |
+          service_type: prometheus
+          service_id: prometheus
+          port: 29090
+          networks:
+            - "{{ network_cidr }}"
+
+    - name: apply node_exporter spec
+      ceph_orch_apply:
+        spec: |
+          service_type: node-exporter
+          service_name: node-exporter
+          port: 29100
+          networks:
+            - "{{ storage_mgmt_cidr }}"
+
+    - name: apply alertmanager spec
+      ceph_orch_apply:
+        spec: |
+          service_type: alertmanager
+          service_name: alertmanager
+          networks:
+            - "{{ network_cidr }}"
+
+    - name: apply grafana spec
+      ceph_orch_apply:
+        spec: |
+          service_type: grafana
+          service_name: grafana
+          port: 23000
+          networks:
+            - "{{ network_cidr }}"
+
+- name: update ingress image
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: set haproxy image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_haproxy
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/haproxy:{{ ceph_release }}"
+
+    - name: set keepalived image
+      ceph_config:
+        action: set
+        who: mgr
+        option: mgr/cephadm/container_image_keepalived
+        value: "{{ docker_registry }}/{{ ceph_docker_namespace }}/keepalived:{{ ceph_release }}"
+
+- name: deploy rgw service
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: update radosgw realm
+      command: >
+        cephadm shell radosgw-admin realm create --rgw-realm={{ ceph_rgw_realm }} --default
+      ignore_errors: true
+
+    - name: update radosgw zonegroup
+      command: >
+        cephadm shell radosgw-admin zonegroup create --rgw-zonegroup={{ ceph_rgw_zonegroup }} --master --default
+      ignore_errors: true
+
+    - name: update radosgw zone
+      command: >
+        cephadm shell radosgw-admin zone create --rgw-zonegroup={{ ceph_rgw_zonegroup }} --rgw-zone={{ ceph_rgw_zone }} --master --default
+      ignore_errors: true
+
+    - name: commit realm
+      command: >
+        cephadm shell radosgw-admin period update --rgw-realm={{ ceph_rgw_realm }} --commit
+      ignore_errors: true
+
+    - name: apply rgw spec
+      ceph_orch_apply:
+        spec: |
+          service_type: rgw
+          service_id: "{{ ceph_rgw_realm }}.{{ ceph_rgw_zone }}"
+          spec:
+            rgw_realm: "{{ ceph_rgw_realm }}"
+            rgw_zone: "{{ ceph_rgw_zone }}"
+            ssl: false
+            rgw_frontend_port: 28080
+            rgw_frontend_type: beast
+          networks:
+            - "{{ network_cidr }}"
+          placement:
+            label: rgw
+
+    - name: apply rgw loadbalancer spec
+      ceph_orch_apply:
+        spec: |
+          service_type: ingress
+          service_id: "rgw.{{ ceph_rgw_realm }}.{{ ceph_rgw_zone }}"
+          placement:
+            host_pattern: 'control*'
+          spec:
+            backend_service: "rgw.{{ ceph_rgw_realm }}.{{ ceph_rgw_zone }}"
+            virtual_ip: "{{ ceph_rgw_external_vip_address }}/24"
+            frontend_port: 8080
+            monitor_port: 21967
+
+- name: deploy mds service
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: deploy mds service
+      command: |
+        cephadm shell ceph fs volume create ufs --placement="label:mds"
+
+- name: deploy nfs service
+  hosts: ceph[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: deploy nfs service
+      ceph_orch_apply:
+        spec: |
+          service_type: nfs
+          service_id: unfs
+          placement:
+            label: nfs
+          networks:
+            - "{{ network_cidr }}"
+          spec:
+            port: 22049
+
+    - name: apply nfs loadbalancer spec
+      ceph_orch_apply:
+        spec: |
+          service_type: ingress
+          service_id: nfs.unfs
+          placement:
+            host_pattern: 'control*'
+          spec:
+            backend_service: nfs.unfs
+            virtual_ip: "{{ ceph_nfs_external_vip_address }}/24"
+            frontend_port: 2049
+            monitor_port: 29000

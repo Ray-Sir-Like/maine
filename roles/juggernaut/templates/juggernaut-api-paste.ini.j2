@@ -1,0 +1,29 @@
+[pipeline:main]
+pipeline = cors healthcheck http_proxy_to_wsgi request_id osprofiler api_v1
+
+[app:api_v1]
+paste.app_factory = juggernaut.api.app:app_factory
+
+# filters
+[filter:authtoken]
+acl_public_routes = /, /v1
+paste.filter_factory = juggernaut.api.middleware.auth_token:AuthTokenMiddleware.factory
+
+[filter:osprofiler]
+paste.filter_factory = juggernaut.common.profiler:WsgiMiddleware.factory
+
+[filter:request_id]
+paste.filter_factory = oslo_middleware:RequestId.factory
+
+[filter:cors]
+paste.filter_factory = oslo_middleware.cors:filter_factory
+oslo_config_project = juggernaut
+
+[filter:healthcheck]
+paste.filter_factory = oslo_middleware:Healthcheck.factory
+backends = disable_by_file
+disable_by_file_path = /etc/juggernaut/healthcheck_disable
+
+[filter:http_proxy_to_wsgi]
+paste.filter_factory = oslo_middleware.http_proxy_to_wsgi:HTTPProxyToWSGI.factory
+oslo_config_project = juggernaut

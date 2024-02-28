@@ -1,0 +1,9 @@
+[DEFAULT]
+debug = {{ furion_logging_debug }}
+log_dir = /var/log/furion
+rpc_addr = {{ api_interface_address }}:{{ furion_agent_rpc_port }}
+heartbeat_interval = 5
+labels = {{ furion_agent_labels }}
+
+[engine_client]
+addr = {{ api_interface_address }}:{{ furion_server_rpc_port }}

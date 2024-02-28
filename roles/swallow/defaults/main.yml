@@ -1,0 +1,212 @@
+---
+project_name: "swallow"
+
+swallow_services:
+  swallow-api:
+    container_name: "swallow_api"
+    group: "swallow-api"
+    image: "{{ swallow_api_image_full }}"
+    enabled: True
+    volumes: "{{ swallow_api_default_volumes + swallow_api_extra_volumes }}"
+    dimensions: "{{ swallow_api_dimensions }}"
+    healthcheck: "{{ swallow_api_healthcheck }}"
+    haproxy:
+      swallow_api:
+        enabled: "{{ enable_swallow }}"
+        mode: "http"
+        external: false
+        port: "{{ swallow_api_port }}"
+      swallow_api_external:
+        enabled: "{{ enable_swallow }}"
+        mode: "http"
+        external: true
+        port: "{{ swallow_api_port }}"
+  swallow-policyengine:
+    container_name: "swallow_policyengine"
+    group: "swallow-policyengine"
+    image: "{{ swallow_policyengine_image_full }}"
+    enabled: True
+    volumes: "{{ swallow_policyengine_default_volumes + swallow_policyengine_extra_volumes }}"
+    dimensions: "{{ swallow_policyengine_dimensions }}"
+    healthcheck: "{{ swallow_policyengine_healthcheck }}"
+  swallow-taskengine:
+    container_name: "swallow_taskengine"
+    group: "swallow-taskengine"
+    image: "{{ swallow_taskengine_image_full }}"
+    enabled: True
+    volumes: "{{ swallow_taskengine_default_volumes + swallow_taskengine_extra_volumes }}"
+    dimensions: "{{ swallow_taskengine_dimensions }}"
+    healthcheck: "{{ swallow_taskengine_healthcheck }}"
+  swallow-monitor:
+    container_name: "swallow_monitor"
+    group: "swallow-monitor"
+    image: "{{ swallow_monitor_image_full }}"
+    enabled: True
+    volumes: "{{ swallow_monitor_default_volumes + swallow_monitor_extra_volumes }}"
+    dimensions: "{{ swallow_monitor_dimensions }}"
+    healthcheck: "{{ swallow_monitor_healthcheck }}"
+
+####################
+# Database
+####################
+swallow_database_name: "swallow"
+swallow_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}swallow{% endif %}"
+swallow_database_address: "{{ database_address }}:{{ database_port }}"
+
+swallow_index_database_name: "swallow_index"
+swallow_index_database_user: "swallow_index"
+swallow_index_database_address: "{{ swallow_database_address }}"
+
+####################
+# Docker
+####################
+swallow_install_type: "{{ kolla_install_type }}"
+swallow_tag: "{{ openstack_tag }}"
+
+swallow_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swallow-api"
+swallow_api_tag: "{{ swallow_tag }}"
+swallow_api_image_full: "{{ swallow_api_image }}:{{ swallow_api_tag }}"
+
+swallow_policyengine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swallow-policyengine"
+swallow_policyengine_tag: "{{ swallow_tag }}"
+swallow_policyengine_image_full: "{{ swallow_policyengine_image }}:{{ swallow_policyengine_tag }}"
+
+swallow_taskengine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swallow-taskengine"
+swallow_taskengine_tag: "{{ swallow_tag }}"
+swallow_taskengine_image_full: "{{ swallow_taskengine_image }}:{{ swallow_taskengine_tag }}"
+
+swallow_monitor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swallow-monitor"
+swallow_monitor_tag: "{{ swallow_tag }}"
+swallow_monitor_image_full: "{{ swallow_monitor_image }}:{{ swallow_monitor_tag }}"
+
+swallow_api_dimensions: "{{ default_container_dimensions }}"
+swallow_policyengine_dimensions: "{{ default_container_dimensions }}"
+swallow_taskengine_dimensions: "{{ default_container_dimensions }}"
+swallow_monitor_dimensions: "{{ default_container_dimensions }}"
+
+swallow_api_enable_healthchecks: "{{ enable_container_healthchecks }}"
+swallow_api_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+swallow_api_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+swallow_api_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+swallow_api_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ swallow_api_port }} "]
+swallow_api_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+swallow_api_healthcheck:
+  interval: "{{ swallow_api_healthcheck_interval }}"
+  retries: "{{ swallow_api_healthcheck_retries }}"
+  start_period: "{{ swallow_api_healthcheck_start_period }}"
+  test: "{% if swallow_api_enable_healthchecks | bool %}{{ swallow_api_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ swallow_api_healthcheck_timeout }}"
+
+swallow_policyengine_enable_healthchecks: "{{ enable_container_healthchecks }}"
+swallow_policyengine_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+swallow_policyengine_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+swallow_policyengine_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+swallow_policyengine_healthcheck_test: ["CMD-SHELL", "healthcheck_filemod /var/log/kolla/swallow/swallow-policyengine.log 4800"]
+swallow_policyengine_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+swallow_policyengine_healthcheck:
+  interval: "{{ swallow_policyengine_healthcheck_interval }}"
+  retries: "{{ swallow_policyengine_healthcheck_retries }}"
+  start_period: "{{ swallow_policyengine_healthcheck_start_period }}"
+  test: "{% if swallow_policyengine_enable_healthchecks | bool %}{{ swallow_policyengine_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ swallow_policyengine_healthcheck_timeout }}"
+
+swallow_taskengine_enable_healthchecks: "{{ enable_container_healthchecks }}"
+swallow_taskengine_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+swallow_taskengine_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+swallow_taskengine_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+swallow_taskengine_healthcheck_test: ["CMD-SHELL", "healthcheck_filemod /var/log/kolla/swallow/swallow-taskengine.log 4800"]
+swallow_taskengine_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+swallow_taskengine_healthcheck:
+  interval: "{{ swallow_taskengine_healthcheck_interval }}"
+  retries: "{{ swallow_taskengine_healthcheck_retries }}"
+  start_period: "{{ swallow_taskengine_healthcheck_start_period }}"
+  test: "{% if swallow_taskengine_enable_healthchecks | bool %}{{ swallow_taskengine_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ swallow_taskengine_healthcheck_timeout }}"
+
+swallow_monitor_enable_healthchecks: "{{ enable_container_healthchecks }}"
+swallow_monitor_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+swallow_monitor_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+swallow_monitor_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+swallow_monitor_healthcheck_test: ["CMD-SHELL", "healthcheck_filemod /var/log/kolla/swallow/swallow-monitor.log 4800"]
+swallow_monitor_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+swallow_monitor_healthcheck:
+  interval: "{{ swallow_monitor_healthcheck_interval }}"
+  retries: "{{ swallow_monitor_healthcheck_retries }}"
+  start_period: "{{ swallow_monitor_healthcheck_start_period }}"
+  test: "{% if swallow_monitor_enable_healthchecks | bool %}{{ swallow_monitor_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ swallow_monitor_healthcheck_timeout }}"
+
+swallow_api_default_volumes:
+  - "{{ node_config_directory }}/swallow-api/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/swallow/swallow:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/swallow' if swallow_dev_mode | bool else '' }}"
+swallow_policyengine_default_volumes:
+  - "{{ node_config_directory }}/swallow-policyengine/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/swallow/swallow:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/swallow' if swallow_dev_mode | bool else '' }}"
+swallow_taskengine_default_volumes:
+  - "{{ node_config_directory }}/swallow-taskengine/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/swallow/swallow:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/swallow' if swallow_dev_mode | bool else '' }}"
+swallow_monitor_default_volumes:
+  - "{{ node_config_directory }}/swallow-monitor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/swallow/swallow:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/swallow' if swallow_dev_mode | bool else '' }}"
+
+swallow_extra_volumes: "{{ default_extra_volumes }}"
+swallow_api_extra_volumes: "{{ swallow_extra_volumes }}"
+swallow_policyengine_extra_volumes: "{{ swallow_extra_volumes }}"
+swallow_taskengine_extra_volumes: "{{ swallow_extra_volumes }}"
+swallow_monitor_extra_volumes: "{{ swallow_extra_volumes }}"
+
+####################
+# Notifications
+####################
+swallow_notification_topics:
+  - name: notifications
+    enabled: "{{ enable_ceilometer | bool }}"
+
+swallow_enabled_notification_topics: "{{ swallow_notification_topics | selectattr('enabled', 'equalto', true) | list }}"
+
+####################
+# OpenStack
+####################
+swallow_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ swallow_api_port }}"
+swallow_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ swallow_api_port }}"
+swallow_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ swallow_api_port }}"
+
+swallow_logging_debug: "{{ openstack_logging_debug }}"
+
+swallow_keystone_user: "swallow"
+
+openstack_swallow_auth: "{{ openstack_auth }}"
+
+####################
+# Kolla
+####################
+swallow_git_repository: "{{ kolla_dev_repos_git }}/{{ project_name }}"
+swallow_dev_repos_pull: "{{ kolla_dev_repos_pull }}"
+swallow_dev_mode: "{{ kolla_dev_mode }}"
+swallow_source_version: "{{ kolla_source_version }}"
+
+####################
+# Keystone
+####################
+swallow_ks_services:
+  - name: "swallow"
+    type: "archive"
+    description: "OpenStack Archive"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ swallow_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ swallow_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ swallow_public_endpoint }}'}
+
+swallow_ks_users:
+  - project: "service"
+    user: "{{ swallow_keystone_user }}"
+    password: "{{ swallow_keystone_password }}"
+    role: "admin"

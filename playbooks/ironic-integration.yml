@@ -1,0 +1,153 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: OpenStack Ironic integration
+  hosts: deployment
+  vars:
+    source_dir: "/usr/share/maine-ansible/config"
+    dest_dir: "/etc/kolla/config"
+  gather_facts: false
+  tags: ironic
+  tasks:
+    - name: Ironic integration
+      block:
+
+        - name: Hacker ironic-inspector user
+          command: >
+            sed -i 's#"owner": "ironic-inspector"#"owner": "ironic"#g' /usr/share/kolla-ansible/ansible/roles/ironic/templates/ironic-inspector.json.j2
+
+        - name: Check ironic fake pxe network existed
+          command: >
+            docker exec kolla_toolbox openstack
+            --os-interface internal
+            --os-auth-url {{ openstack_auth.auth_url }}
+            --os-identity-api-version 3
+            --os-project-domain-name {{ openstack_auth.domain_name }}
+            --os-tenant-name {{ openstack_auth.project_name }}
+            --os-username {{ openstack_auth.username }}
+            --os-password {{ openstack_auth.password }}
+            --os-user-domain-name {{ openstack_auth.domain_name }}
+            {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+            network show baremetal-fake-pxe-net
+          register: ironic_fake_pxe_network_existed
+          failed_when: ironic_fake_pxe_network_existed.rc > 1
+          delegate_to: "{{ groups['ironic-api'][0] }}"
+
+        - name: Prepare ironic fake pxe network
+          command: >
+            docker exec kolla_toolbox openstack
+            --os-interface internal
+            --os-auth-url {{ openstack_auth.auth_url }}
+            --os-identity-api-version 3
+            --os-project-domain-name {{ openstack_auth.domain_name }}
+            --os-tenant-name {{ openstack_auth.project_name }}
+            --os-username {{ openstack_auth.username }}
+            --os-password {{ openstack_auth.password }}
+            --os-user-domain-name {{ openstack_auth.domain_name }}
+            {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+            network create baremetal-fake-pxe-net --project service --tag __baremetal --no-share
+          delegate_to: "{{ groups['ironic-api'][0] }}"
+          when: "'No Network found' in ironic_fake_pxe_network_existed.stderr"
+
+        - name: Check ironic fake pxe subnet existed
+          command: >
+            docker exec kolla_toolbox openstack
+            --os-interface internal
+            --os-auth-url {{ openstack_auth.auth_url }}
+            --os-identity-api-version 3
+            --os-project-domain-name {{ openstack_auth.domain_name }}
+            --os-tenant-name {{ openstack_auth.project_name }}
+            --os-username {{ openstack_auth.username }}
+            --os-password {{ openstack_auth.password }}
+            --os-user-domain-name {{ openstack_auth.domain_name }}
+            {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+            subnet show baremetal-fake-pxe-subnet
+          register: ironic_fake_pxe_subnet_existed
+          failed_when: ironic_fake_pxe_subnet_existed.rc > 1
+          delegate_to: "{{ groups['ironic-api'][0] }}"
+
+        - name: Prepare ironic fake pxe subnet
+          command: >
+            docker exec kolla_toolbox openstack
+            --os-interface internal
+            --os-auth-url {{ openstack_auth.auth_url }}
+            --os-identity-api-version 3
+            --os-project-domain-name {{ openstack_auth.domain_name }}
+            --os-tenant-name {{ openstack_auth.project_name }}
+            --os-username {{ openstack_auth.username }}
+            --os-password {{ openstack_auth.password }}
+            --os-user-domain-name {{ openstack_auth.domain_name }}
+            {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+            subnet create --network baremetal-fake-pxe-net --subnet-range 192.168.0.0/16 --tag __baremetal baremetal-fake-pxe-subnet --project service
+          delegate_to: "{{ groups['ironic-api'][0] }}"
+          when: "'No Subnet found' in ironic_fake_pxe_subnet_existed.stderr"
+
+        - name: Get ironic fake pxe network id
+          command: >
+            docker exec kolla_toolbox openstack
+            --os-interface internal
+            --os-auth-url {{ openstack_auth.auth_url }}
+            --os-identity-api-version 3
+            --os-project-domain-name {{ openstack_auth.domain_name }}
+            --os-tenant-name {{ openstack_auth.project_name }}
+            --os-username {{ openstack_auth.username }}
+            --os-password {{ openstack_auth.password }}
+            --os-user-domain-name {{ openstack_auth.domain_name }}
+            {% if openstack_cacert != '' %}--os-cacert {{ openstack_cacert }}{% endif %}
+            network show baremetal-fake-pxe-net -f value -c id
+          register: ironic_fake_pxe_network_id
+          changed_when: false
+          run_once: True
+          delegate_to: "{{ groups['ironic-api'][0] }}"
+
+        - name: Set fact for ironic fake pxe network
+          set_fact:
+            ironic_cleaning_network: "{{ ironic_fake_pxe_network_id.stdout }}"
+          delegate_facts: True
+          delegate_to: "{{ item }}"
+          with_items: "{{ groups['all'] }}"
+
+        - name: Merge ironic.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/ironic.conf"
+              - "{{ source_dir }}/ironic.conf"
+            dest: "{{ dest_dir }}/ironic.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy ironic-dnsmasq.conf
+          copy:
+            src: "{{ source_dir }}/ironic/ironic-dnsmasq.conf"
+            dest: "{{ dest_dir }}/ironic/ironic-dnsmasq.conf"
+            mode: "0660"
+          become: true
+
+        - name: Merge ironic-inspector.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/ironic-inspector.conf"
+              - "{{ source_dir }}/ironic-inspector.conf"
+            dest: "{{ dest_dir }}/ironic-inspector.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy ironic pxe uefi config
+          copy:
+            src: "{{ source_dir }}/ironic/ironic_pxe_uefi.default"
+            dest: "{{ dest_dir }}/ironic/ironic_pxe_uefi.default"
+            mode: "0660"
+          become: true
+
+        # Note:(Yao Ning) hacker ipxe file in ironic directory
+        # ironic-agent.kernel
+        # ironic-agent.initramfs
+        # are not used; actually use ipa.kernel and ipa.initramfs
+        - name: Enusre ironic-agent files existed for kolla-ansible
+          file:
+            path: "{{ item }}"
+            state: touch
+          loop:
+            - "{{ dest_dir }}/ironic/ironic-agent.kernel"
+            - "{{ dest_dir }}/ironic/ironic-agent.initramfs"
+      when: enable_ironic | bool

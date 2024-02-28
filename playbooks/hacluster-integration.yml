@@ -1,0 +1,13 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Configure Pacemaker After Deployment
+  gather_facts: false
+  hosts:
+    - hacluster
+    - hacluster-remote
+  tasks:
+    - name: Disable pacemaker stonith feature
+      command: >
+        docker exec hacluster_pacemaker pcs property set stonith-enabled=false
+      run_once: True

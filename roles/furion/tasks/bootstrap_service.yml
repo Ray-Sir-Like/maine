@@ -1,0 +1,7 @@
+---
+- name: Initialize the furion database tables
+  become: True
+  command: |
+    /usr/local/bin/furion-manage --config /etc/furion/furion-server.conf db-sync
+  run_once: True
+  delegate_to: "{{ groups['furion-server'][0] }}"

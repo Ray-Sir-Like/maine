@@ -1,0 +1,20 @@
+---
+- name: Stop and remove operation and user guide
+  become: true
+  tags: docs
+  kolla_docker:
+    action: "stop_and_remove_container"
+    name: "{{ item }}"
+  loop:
+    - uos-operation-guide
+    - uos-user-guide
+
+- name: Ensure docs service exists
+  become: true
+  tags: docs
+  kolla_docker:
+    action: "recreate_or_restart_container"
+    common_options: "{{ docker_common_options }}"
+    name: "docs"
+    image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/docs:{{ docs_release }}"
+    dimensions: "{{ default_container_dimensions }}"

@@ -1,0 +1,61 @@
+{
+    "command": "/usr/sbin/grafana-server --homepath=/usr/share/grafana --config=/opt/grafana/conf/grafana.ini",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/grafana.ini",
+            "dest": "/opt/grafana/conf/grafana.ini",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/prometheus.yml",
+            "dest": "/opt/grafana/conf/provisioning/datasources/prometheus.yml",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/dashboards.yml",
+            "dest": "/opt/grafana/conf/provisioning/dashboards/default.yml",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/infrastructure-*.json",
+            "dest": "/grafana/dashboards/infrastructure/",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+
+            "source": "{{ container_config_directory }}/openstack-*.json",
+            "dest": "/grafana/dashboards/openstack/",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/grafana_home_dashboard.json",
+            "dest": "/opt/grafana/public/dashboards/home.json",
+            "owner": "root",
+            "perm": "0644",
+            "optional": true
+        },
+        {
+            "source": "{{ container_config_directory }}/grafana.ini",
+            "dest": "/grafana/placeholder",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/grafana",
+            "owner": "root:root",
+            "recurse": false
+        },
+        {
+            "path": "/var/log/kolla/hawkeye",
+            "owner": "root:root",
+            "recurse": false
+        }
+    ]
+}

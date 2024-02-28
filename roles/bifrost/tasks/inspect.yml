@@ -1,0 +1,12 @@
+---
+- name: Copy inspector script
+  copy:
+    src: inspector.py
+    dest: "{{ node_config_directory }}/bifrost/inspector.py"
+    mode: "0755"
+  become: true
+
+- name: Do introspect
+  command: >
+    docker exec bifrost_deploy
+    python /etc/bifrost/inspector.py

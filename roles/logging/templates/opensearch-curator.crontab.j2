@@ -1,0 +1,3 @@
+PATH=/usr/local/bin:/usr/bin:/bin
+
+{{ logging_opensearch_curator_cron_schedule }} curator --config /etc/opensearch-curator/curator.yml {% if logging_opensearch_curator_dry_run|bool %}--dry-run {% endif %}/etc/opensearch-curator/actions.yml

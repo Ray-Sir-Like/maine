@@ -1,0 +1,51 @@
+---
+- name: Disable OpenSSH Server DNS PTR
+  block:
+    - name: disable useDNS in sshd_config
+      lineinfile: dest=/etc/ssh/sshd_config regexp='^#?UseDNS' line='UseDNS no'
+      become: True
+
+    - name: restart sshd service
+      systemd:
+        name: sshd
+        state: restarted
+      become: True
+  when: not disable_configure_openssh_server | bool
+
+- name: Ensure python3-libselinux existed
+  package:
+    name: "python3-libselinux"
+    state: present
+  become: True
+
+# FIXME(Yao Ning): Currently docker container should be running with Permissive selinux policy
+- name: Setting Selinux Policy Explicitly
+  selinux:
+    policy: targeted
+    state: "{{ selinux_default_policy }}"
+  become: True
+  when: not disable_configure_selinux_policy | bool
+
+- name: Disable Firewalld Service, Use Iptables Service Instead
+  block:
+    - name: Check if firewalld is installed
+      command: rpm -q firewalld
+      args:
+        warn: no
+      register: firewalld_check
+      failed_when: firewalld_check.rc > 1
+
+    - name: Disable firewalld service
+      service:
+        name: "firewalld"
+        enabled: False
+        state: stopped
+      when:
+        - firewalld_check.rc == 0
+      become: True
+
+    - name: Install iptables service
+      package:
+        name: iptables-services
+        state: present
+      become: True

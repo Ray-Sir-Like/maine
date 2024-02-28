@@ -1,0 +1,23 @@
+Listen {{ api_interface_address }}:{{ porsche_api_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<VirtualHost *:{{ porsche_api_port }}>
+
+  ErrorLog "/var/log/kolla/porsche/porsche-api-error.log"
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "/var/log/kolla/porsche/porsche-api-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess porsche group=porsche processes={{ openstack_service_workers }} threads=1 user=porsche
+  WSGIProcessGroup porsche
+  WSGIScriptAlias / "/usr/bin/porsche-api"
+
+  <Directory "/usr/bin">
+       <FilesMatch "^porsche-api$">
+            Require all granted
+       </FilesMatch>
+  </Directory>
+
+</VirtualHost>

@@ -1,0 +1,471 @@
+---
+- name: Kolla configuration optimization
+  hosts: deployment
+  vars:
+    source_dir: "/usr/share/maine-ansible/config"
+    dest_dir: "/etc/kolla/config"
+  # Variables used by ustack_service_plugins
+  vars_files:
+    - "/usr/share/kolla-ansible/ansible/roles/neutron/defaults/main.yml"
+    - "/usr/share/kolla-ansible/ansible/roles/octavia/defaults/main.yml"
+  tags: always
+  tasks:
+    - name: Ensure configuration directory is created
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ dest_dir }}"
+        - "{{ dest_dir }}/aodh"
+        - "{{ dest_dir }}/barbican"
+        - "{{ dest_dir }}/ceilometer"
+        - "{{ dest_dir }}/cinder"
+        - "{{ dest_dir }}/cloudkitty"
+        - "{{ dest_dir }}/neutron"
+        - "{{ dest_dir }}/prometheus"
+        - "{{ dest_dir }}/nova"
+        - "{{ dest_dir }}/glance"
+        - "{{ dest_dir }}/senlin"
+        - "{{ dest_dir }}/manila"
+        - "{{ dest_dir }}/masakari"
+        - "{{ dest_dir }}/designate"
+        - "{{ dest_dir }}/heat"
+        - "{{ dest_dir }}/ironic"
+
+    - name: Merge ceilometer.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/ceilometer.conf"
+          - "{{ source_dir }}/ceilometer.conf"
+        dest: "{{ dest_dir }}/ceilometer.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge ceilometer.conf in ceilometer-central
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/ceilometer/ceilometer-central.conf"
+          - "{{ source_dir }}/ceilometer/ceilometer-central.conf"
+        dest: "{{ dest_dir }}/ceilometer/ceilometer-central.conf"
+        mode: "0660"
+      become: true
+
+    - name: Templating ceilometer custom event_definitions.yaml configuration
+      template:
+        src: "{{ source_dir }}/ceilometer/event_definitions.yaml.j2"
+        dest: "{{ dest_dir }}/ceilometer/event_definitions.yaml"
+
+    - name: Templating ceilometer custom event_pipeline.yaml configuration
+      template:
+        src: "{{ source_dir }}/ceilometer/event_pipeline.yaml.j2"
+        dest: "{{ dest_dir }}/ceilometer/event_pipeline.yaml"
+
+    - name: Templating ceilometer custom pipeline.yaml configuration
+      template:
+        src: "{{ source_dir }}/ceilometer/pipeline.yaml.j2"
+        dest: "{{ dest_dir }}/ceilometer/pipeline.yaml"
+
+    - name: Templating ceilometer custom polling.yaml configuration
+      template:
+        src: "{{ source_dir }}/ceilometer/polling.yaml.j2"
+        dest: "{{ dest_dir }}/ceilometer/polling.yaml"
+
+    - name: Templating cloudkitty custom metrics.yml configuration
+      template:
+        src: "{{ source_dir }}/cloudkitty/metrics.yml.j2"
+        dest: "{{ dest_dir }}/cloudkitty/metrics.yml"
+
+    - name: Merge designate.conf in designate
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/designate.conf"
+          - "{{ source_dir }}/designate.conf"
+        dest: "{{ dest_dir }}/designate.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge pools.yaml in designate
+      template:
+        src: "{{ source_dir }}/designate/pools.yaml.j2"
+        dest: "{{ dest_dir }}/designate/pools.yaml"
+        mode: "0660"
+      become: true
+
+    - name: Templating prometheus custom prometheus.yml configuration
+      template:
+        src: "{{ source_dir }}/prometheus/prometheus.yml.j2"
+        dest: "{{ dest_dir }}/prometheus/prometheus.yml"
+      when:
+        - enable_prometheus | bool
+
+    - name: Merge global.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/global.conf"
+          - "{{ source_dir }}/global.conf"
+        dest: "{{ dest_dir }}/global.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge cloudkitty.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/cloudkitty.conf"
+          - "{{ source_dir }}/cloudkitty.conf"
+        dest: "{{ dest_dir }}/cloudkitty.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge cinder.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/cinder.conf"
+          - "{{ source_dir }}/cinder.conf"
+        dest: "{{ dest_dir }}/cinder.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge cinder.conf in cinder-backup
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/cinder/cinder-backup.conf"
+          - "{{ source_dir }}/cinder/cinder-backup.conf"
+        dest: "{{ dest_dir }}/cinder/cinder-backup.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge glance.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/glance.conf"
+          - "{{ source_dir }}/glance.conf"
+        dest: "{{ dest_dir }}/glance.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge heat.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/heat.conf"
+          - "{{ source_dir }}/heat.conf"
+        dest: "{{ dest_dir }}/heat.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge octavia.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/octavia.conf"
+          - "{{ source_dir }}/octavia.conf"
+        dest: "{{ dest_dir }}/octavia.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge keystone.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/keystone.conf"
+          - "{{ source_dir }}/keystone.conf"
+        dest: "{{ dest_dir }}/keystone.conf"
+        mode: "0660"
+      become: true
+
+    - name: Copy manila policy.json
+      copy:
+        src: "{{ source_dir }}/manila/policy.json"
+        dest: "{{ dest_dir }}/manila/policy.json"
+        mode: "0660"
+      become: true
+
+    - name: Merge manila.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/manila.conf"
+          - "{{ source_dir }}/manila.conf"
+        dest: "{{ dest_dir }}/manila.conf"
+        mode: "0660"
+      become: true
+
+    - name: Audit manila service
+      block:
+        - name: Merge manila_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/manila/manila_audit_map.conf"
+              - "{{ source_dir }}/manila/manila_audit_map.conf"
+            dest: "{{ dest_dir }}/manila/manila_audit_map.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy manila api-paste.ini
+          template:
+            src: "{{ source_dir }}/manila/manila-api-paste.ini"
+            dest: "{{ dest_dir }}/manila/manila-api-paste.ini"
+            mode: "0660"
+          become: true
+      when:
+        - enable_manila_audit | bool
+    - name: Audit heat service
+      block:
+        - name: Merge heat_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/heat/heat_audit_map.conf"
+              - "{{ source_dir }}/heat/heat_audit_map.conf"
+            dest: "{{ dest_dir }}/heat/heat_audit_map.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy heat api-paste.ini
+          template:
+            src: "{{ source_dir }}/heat/heat-api-paste.ini"
+            dest: "{{ dest_dir }}/heat/heat-api-paste.ini"
+            mode: "0660"
+          become: true
+      when:
+        - enable_heat_audit | bool
+
+    - name: Merge designate_audit_map.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/designate/designate_audit_map.conf"
+          - "{{ source_dir }}/designate/designate_audit_map.conf"
+        dest: "{{ dest_dir }}/designate/designate_audit_map.conf"
+        mode: "0660"
+      become: true
+
+    - name: Copy designate api-paste.ini
+      template:
+        src: "{{ source_dir }}/designate/designate-api-paste.ini"
+        dest: "{{ dest_dir }}/designate/designate-api-paste.ini"
+        mode: "0660"
+      become: true
+      when:
+        - enable_designate_audit | bool
+
+    - name: Copy manila-share.conf if the target file does not exist
+      copy:
+        src: "{{ source_dir }}/manila-share.conf"
+        dest: "{{ dest_dir }}/manila-share.conf"
+        mode: "0660"
+        force: no
+      become: true
+
+    - name: Merge neutron.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/neutron.conf"
+          - "{{ source_dir }}/neutron.conf"
+        dest: "{{ dest_dir }}/neutron.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge neutron ml2_conf.ini
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/neutron/ml2_conf.ini"
+          - "{{ source_dir }}/neutron/ml2_conf.ini"
+        dest: "{{ dest_dir }}/neutron/ml2_conf.ini"
+        mode: "0660"
+      become: true
+
+    - name: Merge neutron openvswitch_agent.ini
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/neutron/openvswitch_agent.ini"
+          - "{{ source_dir }}/neutron/openvswitch_agent.ini"
+        dest: "{{ dest_dir }}/neutron/openvswitch_agent.ini"
+        mode: "0660"
+      become: true
+
+    - name: Merge nova.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/nova.conf"
+          - "{{ source_dir }}/nova.conf"
+        dest: "{{ dest_dir }}/nova.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge senlin.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/senlin.conf"
+          - "{{ source_dir }}/senlin.conf"
+        dest: "{{ dest_dir }}/senlin.conf"
+        mode: "0660"
+      become: true
+
+    - name: Audit senlin service
+      block:
+        - name: Merge senlin_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/senlin/senlin_audit_map.conf"
+              - "{{ source_dir }}/senlin/senlin_audit_map.conf"
+            dest: "{{ dest_dir }}/senlin/senlin_audit_map.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy senlin api-paste.ini
+          template:
+            src: "{{ source_dir }}/senlin/senlin-api-paste.ini"
+            dest: "{{ dest_dir }}/senlin/senlin-api-paste.ini"
+            mode: "0660"
+          become: true
+      when:
+        - enable_senlin_audit | bool
+
+    - name: Merge masakari-monitor.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/masakari/masakari-monitors.conf"
+          - "{{ source_dir }}/masakari/masakari-monitors.conf"
+        dest: "{{ dest_dir }}/masakari/masakari-monitors.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge mistral.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/mistral.conf"
+          - "{{ source_dir }}/mistral.conf"
+        dest: "{{ dest_dir }}/mistral.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge galera.cnf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/galera.cnf"
+          - "{{ source_dir }}/galera.cnf"
+        dest: "{{ dest_dir }}/galera.cnf"
+
+    - name: Merge panko.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/panko.conf"
+          - "{{ source_dir }}/panko.conf"
+        dest: "{{ dest_dir }}/panko.conf"
+        mode: "0660"
+      become: true
+
+    - name: Merge aodh.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/aodh.conf"
+          - "{{ source_dir }}/aodh.conf"
+        dest: "{{ dest_dir }}/aodh.conf"
+        mode: "0660"
+      become: true
+
+    - name: Audit aodh service
+      block:
+        - name: Merge aodh_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/aodh/aodh_audit_map.conf"
+              - "{{ source_dir }}/aodh/aodh_audit_map.conf"
+            dest: "{{ dest_dir }}/aodh/aodh_audit_map.conf"
+            mode: "0660"
+          become: true
+
+        - name: Copy aodh api-paste.ini
+          template:
+            src: "{{ source_dir }}/aodh/aodh-api-paste.ini"
+            dest: "{{ dest_dir }}/aodh/aodh-api-paste.ini"
+            mode: "0660"
+          become: true
+      when:
+        - enable_aodh_audit | bool
+
+    - name: Merge rally.conf
+      merge_configs:
+        sources:
+          - "{{ dest_dir }}/rally.conf"
+          - "{{ source_dir }}/rally.conf"
+        dest: "{{ dest_dir }}/rally.conf"
+        mode: "0660"
+      become: true
+
+    - name: Copy barbican policy.json
+      copy:
+        src: "{{ source_dir }}/barbican/policy.json"
+        dest: "{{ dest_dir }}/barbican/policy.json"
+        mode: "0660"
+      become: true
+
+    # Note(Ning Yao): cinder explictly setting policy_file to policy.yaml
+    - name: Copy cinder policy.yaml
+      copy:
+        src: "{{ source_dir }}/cinder/policy.json"
+        dest: "{{ dest_dir }}/cinder/policy.yaml"
+        mode: "0660"
+      become: true
+
+    - name: Audit cinder service
+      block:
+        - name: Copy cinder api-paste.ini
+          template:
+            src: "{{ source_dir }}/cinder/cinder-api-paste.ini"
+            dest: "{{ dest_dir }}/cinder/cinder-api-paste.ini"
+            mode: "0660"
+          become: true
+
+        - name: Merge cinder_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/cinder/cinder_audit_map.conf"
+              - "{{ source_dir }}/cinder/cinder_audit_map.conf"
+            dest: "{{ dest_dir }}/cinder/cinder_audit_map.conf"
+            mode: "0660"
+          become: true
+      when:
+        - enable_cinder_audit | bool
+
+    - name: Copy glance api-paste.ini
+      template:
+        src: "{{ source_dir }}/glance/glance-api-paste.ini"
+        dest: "{{ dest_dir }}/glance/glance-api-paste.ini"
+        mode: "0660"
+      become: true
+      when:
+        - enable_glance_audit | bool
+
+    - name: Audit nova service
+      block:
+        - name: Copy nova api-paste.ini
+          template:
+            src: "{{ source_dir }}/nova/nova-api-paste.ini"
+            dest: "{{ dest_dir }}/nova/nova-api-paste.ini"
+            mode: "0660"
+          become: true
+
+        - name: Merge nova_audit_map.conf
+          merge_configs:
+            sources:
+              - "{{ dest_dir }}/nova/nova_audit_map.conf"
+              - "{{ source_dir }}/nova/nova_audit_map.conf"
+            dest: "{{ dest_dir }}/nova/nova_audit_map.conf"
+            mode: "0660"
+          become: true
+      when:
+        - enable_nova_audit | bool
+
+    - name: Copy neutron api-paste.ini
+      template:
+        src: "{{ source_dir }}/neutron/neutron-api-paste.ini"
+        dest: "{{ dest_dir }}/neutron/neutron-api-paste.ini"
+        mode: "0660"
+      become: true
+      when:
+        - enable_neutron_audit | bool
+
+    - name: Copy barbican api-paste.ini
+      template:
+        src: "{{ source_dir }}/barbican/barbican-api-paste.ini"
+        dest: "{{ dest_dir }}/barbican/barbican-api-paste.ini"
+        mode: "0660"
+      become: true
+      when:
+        enable_barbican_audit | bool

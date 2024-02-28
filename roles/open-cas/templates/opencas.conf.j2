@@ -1,0 +1,32 @@
+version=19.3.0
+# Version tag has to be first line in this file
+#
+# Open CAS configuration file - for reference on syntax
+# of this file please refer to appropriate documentation
+
+# NOTES:
+# 1) It is highly recommended to specify cache/core device using path
+# that is constant across reboots - e.g. disk device links in
+# /dev/disk/by-id/, preferably those using device WWN if available:
+#   /dev/disk/by-id/wwn-0x123456789abcdef0
+# Referencing devices via /dev/sd* may result in cache misconfiguration after
+# system reboot due to change(s) in drive order.
+
+## Caches configuration section
+[caches]
+## Cache ID     Cache device                            Cache mode      Extra fields (optional)
+## Uncomment and edit the below line for cache configuration
+#1              /dev/disk/by-id/nvme-INTEL_SSDP..       WT
+{% for disk in ssd_cache_devices %}
+{{ loop.index }}  {{ '/dev/disk/by-id/' + disk.links.ids[0] }}  WB
+{% endfor %}
+
+## Core devices configuration
+[cores]
+## Cache ID     Core ID         Core device
+## Uncomment and edit the below line for core configuration
+#1              1               /dev/disk/by-id/wwn-0x123456789abcdef0
+{% for disk in hdd_non_cache_devices %}
+{{ loop.index % ssd_cache_devices|length + 1 }}  {{ loop.index }}  {{ '/dev/disk/by-id/wwn-' + disk.wwn }}
+{% endfor %}
+

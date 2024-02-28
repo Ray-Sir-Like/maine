@@ -1,0 +1,10 @@
+---
+- name: Stop pacemaker mariadb resource
+  command: >
+      docker exec hacluster_pacemaker pcs resource disable mariadb-bundle
+  run_once: True
+
+- name: Stop pacemaker mariadb clustercheck resource
+  command: >
+      docker exec hacluster_pacemaker pcs resource disable mariadb-clustercheck-bundle
+  run_once: True

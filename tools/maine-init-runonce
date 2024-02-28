@@ -1,0 +1,375 @@
+#!/bin/bash
+
+KOLLA_DEBUG=${KOLLA_DEBUG:-0}
+
+KOLLA_OPENSTACK_COMMAND=openstack
+
+if [[ $KOLLA_DEBUG -eq 1 ]]; then
+    set -o xtrace
+    KOLLA_OPENSTACK_COMMAND="$KOLLA_OPENSTACK_COMMAND --debug"
+fi
+
+# Ensure lock directory exists
+LOCK_DIR="${HOME}/.maine/init.lock"
+mkdir -p ${LOCK_DIR}
+
+# This script is meant to be run once after running start for the first
+# time.
+
+# Image
+ARCH=$(arch)
+DISK_FORMAT=${DISK_FORMAT:-'raw'}
+HW_QEMU_GUEST_AGENT=${HW_QEMU_GUEST_AGENT:-'yes'}
+WINDOWS_PROPERTY=${WINDOWS_PROPERTY:-'
+    --property os_admin_user=Administrator
+    --property os_distro=windows
+    --property os_type=windows
+    --property hw_video_model=qxl
+    --property hw_video_ram=64
+    --property hw_cpu_max_sockets=2
+    --property hw_cpu_max_threads=2
+'}
+LINUX_PROPERTY=${LINUX_PROPERTY:-'
+    --property os_admin_user=root
+    --property os_type=linux
+    --property hw_rescue_device=disk
+'}
+IMAGE_PATH="/opt/cache/images/"
+IMAGE_URL="http://image.internal.ustack.com"
+IMAGE_LIST=${IMAGE_LIST:-
+    "CentOS---8.2-x86_64---2020-08-16-a.raw"
+    "CentOS---8.1-x86_64---2020-08-16-a.raw"
+    "CentOS---7.8-x86_64---2020-07-16-a.raw"
+    "CentOS---7.7-x86_64---2020-07-16-a.raw"
+    "Ubuntu---16.04.4-64bit---2018-03-28-a.dsk"
+    "Ubuntu---18.04-64bit---2018-04-27-a.dsk"
+    "Windows---server-2019-datacenter-64bit-cn---2019-04-29-syspreped.dsk"
+    "Windows---server-2016-datacenter-64bit-cn---2018-01-15-syspreped.dsk"
+}
+
+# Network
+# This EXT_NET_CIDR is your public network,that you want to connect to the internet via.
+ENABLE_EXT_NET=${ENABLE_EXT_NET:-0}
+EXT_NET_NAME=${EXT_NET_NAME:-'public'}
+EXT_NET_CIDR=${EXT_NET_CIDR:-'10.0.6.0/24'}
+EXT_NET_RANGE=${EXT_NET_RANGE:-'start=10.0.6.100,end=10.0.6.200'}
+EXT_NET_GATEWAY=${EXT_NET_GATEWAY:-'10.0.6.1'}
+
+# Flavor
+FLAVOR_DISK=${FLAVOR_DISK:-0}
+FLAVOR_PROPERTY=${FLAVOR_PROPERTY:-'--property hw_video:ram_max_mb=64'}
+FLAVOR_HYGON=${FLAVOR_HYGON:-0}
+FLAVOR_HYGON_CPU_MODEL_NAME=${FLAVOR_HYGON_CPU_MODEL_NAME:-"Hygon C86 7280 32-core Processor"}
+FLAVOR_HYGON_PROPERTY=("hw:cpu_model_id=${FLAVOR_HYGON_CPU_MODEL_NAME}" "hw:cpu_vendor=AuthenticAMD" "hw:cpu_name=EPYC" "hw:cpu_sockets=2" "hw:cpu_cores=2")
+
+# Volume
+CINDER_AZ=${CINDER_AZ:-'nova'}
+BACKEND_NAMES=$(grep 'enabled_backends' /etc/kolla/cinder-volume/cinder.conf | awk -F ' = ' {'print $2'})
+BACKENDS=$(echo "${BACKEND_NAMES//,/ }")
+
+# VMHA
+SEGMENT_NAME=${SEGMENT_NAME:-'RegionOne'}
+SERVICE_TYPE=${SERVICE_TYPE:-'COMPUTE'}
+RECOVERY_METHOD=${RECOVERY_METHOD:-'auto'}
+HOST_TYPE=${HOST_TYPE:-'COMPUTE'}
+CONTROL_ATTRIBUTES=${CONTROL_ATTRIBUTES:-'SSH'}
+
+# Sanitize language settings to avoid commands bailing out
+# with "unsupported locale setting" errors.
+unset LANG
+unset LANGUAGE
+LC_ALL=C
+export LC_ALL
+for i in curl openstack; do
+    if [[ ! $(type ${i} 2>/dev/null) ]]; then
+        if [ "${i}" == 'curl' ]; then
+            echo "Please install ${i} before proceeding"
+        else
+            echo "Please install python-${i}client before proceeding"
+        fi
+        exit
+    fi
+done
+
+# Test for credentials set
+if [[ "${OS_USERNAME}" == "" ]]; then
+    echo "No Keystone credentials specified. Try running source /root/admin-openrc command"
+    exit
+fi
+
+
+echo Creating glance images...
+if ! [ -f "${LOCK_DIR}/glance.lock" ]; then
+    # Image, Ensure the cache directory is exists
+    mkdir -p ${IMAGE_PATH}
+
+    echo Checking for locally available images...
+    for IMAGE in ${IMAGE_LIST}; do
+        if ! [ -f "${IMAGE_PATH}/${IMAGE}" ]; then
+            echo ${IMAGE_PATH}/${IMAGE} Not found, downloading image ${IMAGE} from ${IMAGE_URL}.
+            curl --retry 5 -L -o ${IMAGE_PATH}/${IMAGE} ${IMAGE_URL}/${IMAGE}
+            curl --retry 5 -L -o ${IMAGE_PATH}/${IMAGE}.md5sum ${IMAGE_URL}/${IMAGE}.md5sum
+            if ! [[ "$(md5sum ${IMAGE_PATH}/${IMAGE} | awk '{print $1}')x" == "$(cat ${IMAGE_PATH}/${IMAGE}.md5sum | awk '{print $1}')x" ]]; then
+                echo "ERROR: md5sum does not match!"
+                exit
+            fi
+        else
+            echo Using cached images.
+        fi
+    done
+
+    echo Creating ...
+    for IMAGE in ${IMAGE_LIST}; do
+        DISTRO_PROPERTY=''
+        IMAGE_BUILD_VERSION=$(awk -F'---' '{print $3}' <<< "${IMAGE}" | awk -F'.' '{print $1}')
+        IMAGE_NAME=$(awk -F'---' '{print $1" "$2}' <<< "${IMAGE}")
+        IMAGE_NAME=$(echo "${IMAGE_NAME//-/ }")
+        OS_VERSION=$(awk -F'---' '{print $2}' <<< "${IMAGE}")
+        if [[ $IMAGE == *"Windows"* ]]; then
+            MIN_DISK="40"
+            MIN_RAM="4096"
+            PROPERTY=${WINDOWS_PROPERTY}
+        else
+            DISTRO=$(awk -F'---' '{print $1}' <<< "${IMAGE}")
+            # lower
+            DISTRO=$(echo ${DISTRO,,})
+            DISTRO_PROPERTY="--property os_distro=${DISTRO}"
+            MIN_DISK="20"
+            MIN_RAM="512"
+            PROPERTY=${LINUX_PROPERTY}
+            if [[ $IMAGE == *"CoreOS"* ]]; then
+                DISTRO_PROPERTY='--property os_distro=gentoo --property os_distro_icon_override=coreos'
+            elif [[ $IMAGE == *"NeoKylin"* ]]; then
+                DISTRO_PROPERTY='--property os_distro=centos --property os_distro_icon_override=neokylin'
+            elif [[ $IMAGE == *"Kylin"* ]]; then
+                DISTRO_PROPERTY='--property os_distro=ubuntu" --property os_distro_icon_override=kylin'
+            elif [[ $IMAGE == *"UOS"* ]]; then
+                DISTRO_PROPERTY='--property os_distro=ubuntu --property os_distro_icon_override=uos'
+            fi
+        PROPERTY=$(echo ${PROPERTY} | tr -d "'")
+        DISTRO_PROPERTY=$(echo ${DISTRO_PROPERTY} | tr -d "'")
+        fi
+        $KOLLA_OPENSTACK_COMMAND image create --disk-format ${DISK_FORMAT} --container-format bare --public \
+            --min-disk ${MIN_DISK} --min-ram ${MIN_RAM} \
+            --property architecture=${ARCH} \
+            --property hw_architecture=${ARCH} \
+            --property hw_qemu_guest_agent=${HW_QEMU_GUEST_AGENT} \
+            --property image_build_version=${IMAGE_BUILD_VERSION} \
+            --property os_version=${OS_VERSION} \
+            --property hw_vif_model="virtio" \
+            --property hw_disk_bus="virtio" \
+            ${DISTRO_PROPERTY} \
+            ${PROPERTY} \
+            --file ${IMAGE_PATH}/${IMAGE} "${IMAGE_NAME}" &
+    done
+    touch ${LOCK_DIR}/glance.lock
+else
+    echo ${LOCK_DIR}/glance.lock exists, skipping...
+fi
+
+
+# Network, create public network and subnet.
+echo Configuring neutron external network...
+if ! [ -f "${LOCK_DIR}/neutron.lock" ]; then
+    if [[ $ENABLE_EXT_NET -eq 1 ]]; then
+        $KOLLA_OPENSTACK_COMMAND network create --external --provider-physical-network physnet1 \
+            --provider-network-type flat ${EXT_NET_NAME}
+        $KOLLA_OPENSTACK_COMMAND subnet create --no-dhcp \
+            --allocation-pool ${EXT_NET_RANGE} --network ${EXT_NET_NAME} \
+            --subnet-range ${EXT_NET_CIDR} --gateway ${EXT_NET_GATEWAY} ${EXT_NET_NAME}-subnet
+    fi
+    touch ${LOCK_DIR}/neutron.lock
+else
+    echo ${LOCK_DIR}/neutron.lock exists, skipping...
+fi
+
+
+# Flavor, add default flavors, if they don't already exist.
+echo Creating flavors...
+if [ ${FLAVOR_HYGON} != 0 ]; then
+    for prop in "${FLAVOR_HYGON_PROPERTY[@]}";do
+        FLAVOR_PROPERTY="${FLAVOR_PROPERTY} --property \"${prop}\""
+    done
+fi
+if ! [ -f "${LOCK_DIR}/nova.lock" ]; then
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 512 --disk ${FLAVOR_DISK} --vcpus 1 ${FLAVOR_PROPERTY} t2.nano > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 1024 --disk ${FLAVOR_DISK} --vcpus 1 ${FLAVOR_PROPERTY} t2.micro > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 2048 --disk ${FLAVOR_DISK} --vcpus 1 ${FLAVOR_PROPERTY} t2.small > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 512 --disk ${FLAVOR_DISK} --vcpus 2 ${FLAVOR_PROPERTY} t3.nano > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 1024 --disk ${FLAVOR_DISK} --vcpus 2 ${FLAVOR_PROPERTY} t3.micro > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 2048 --disk ${FLAVOR_DISK} --vcpus 2 ${FLAVOR_PROPERTY} t3.small > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 4096 --disk ${FLAVOR_DISK} --vcpus 2 ${FLAVOR_PROPERTY} t3.medium > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 8192 --disk ${FLAVOR_DISK} --vcpus 2 ${FLAVOR_PROPERTY} t3.large > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 16384 --disk ${FLAVOR_DISK} --vcpus 4 ${FLAVOR_PROPERTY} t3.xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 32768 --disk ${FLAVOR_DISK} --vcpus 8 ${FLAVOR_PROPERTY} t3.2xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 65536 --disk ${FLAVOR_DISK} --vcpus 16 ${FLAVOR_PROPERTY} t3.4xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 8192 --disk ${FLAVOR_DISK} --vcpus 4 ${FLAVOR_PROPERTY} c5.xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 16384 --disk ${FLAVOR_DISK} --vcpus 8 ${FLAVOR_PROPERTY} c5.2xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 32768 --disk ${FLAVOR_DISK} --vcpus 16 ${FLAVOR_PROPERTY} c5.4xlarge > /dev/null 2>&1" &
+    bash -c "$KOLLA_OPENSTACK_COMMAND flavor create --ram 65536 --disk ${FLAVOR_DISK} --vcpus 32 ${FLAVOR_PROPERTY} c5.8xlarge > /dev/null 2>&1" &
+    touch ${LOCK_DIR}/nova.lock
+else
+    echo ${LOCK_DIR}/nova.lock exists, skipping...
+fi
+
+
+# Volume, create default volume backends.
+echo Configuring cinder backends.
+if ! [ -f "${LOCK_DIR}/cinder.lock" ]; then
+    for BACKEND in ${BACKENDS}; do
+        if ! $KOLLA_OPENSTACK_COMMAND volume type list | grep -q ${BACKEND}; then
+            $KOLLA_OPENSTACK_COMMAND volume type create ${BACKEND} \
+                --property volume_backend_name=${BACKEND} \
+                --property RESKEY:availability_zones=${CINDER_AZ} &
+        fi
+    done
+    touch ${LOCK_DIR}/cinder.lock
+else
+    echo ${LOCK_DIR}/cinder.lock exists, skipping...
+fi
+
+
+# Share, create default share types.
+echo Configuring manila default types...
+if ! [ -f "${LOCK_DIR}/manila.lock" ]; then
+    if $KOLLA_OPENSTACK_COMMAND endpoint list | grep -q 'manila'; then
+        if grep -q 'cephfsnative1' /etc/kolla/manila-share/manila.conf; then
+            manila type-create \
+            --snapshot_support true \
+            --create_share_from_snapshot_support true \
+            --revert_to_snapshot_support false \
+            --mount_snapshot_support false \
+            --extra-specs vendor_name="Ceph" storage_protocol="CEPHFS" share_backend_name="CEPHFS1" \
+            --is_public true \
+            cephfs false &
+        fi
+        if grep -q 'cephfsnfs1' /etc/kolla/manila-share/manila.conf; then
+            manila type-create \
+            --snapshot_support true \
+            --create_share_from_snapshot_support true \
+            --revert_to_snapshot_support false \
+            --mount_snapshot_support false \
+            --extra-specs vendor_name="Ceph" storage_protocol="NFS" share_backend_name="CEPHFSNFS1" \
+            --is_public true \
+            cephnfs false &
+        fi
+    fi
+    touch ${LOCK_DIR}/manila.lock
+else
+    echo ${LOCK_DIR}/manila.lock exists, skipping...
+fi
+
+# Billing, create default price.
+echo Configuring default billing price...
+if ! [ -f "${LOCK_DIR}/cloudkitty.lock" ]; then
+    if $KOLLA_OPENSTACK_COMMAND endpoint list | grep -q 'cloudkitty'; then
+        # enable hashmap
+        cloudkitty module enable hashmap
+
+        # instance
+        cloudkitty hashmap service create instance
+        INSTANCE_SERVICE_ID=$(cloudkitty hashmap service list | grep instance | awk '{print $4}')
+        cloudkitty hashmap field create ${INSTANCE_SERVICE_ID} flavor_name
+        FLAVOR_NAME_FIELD_ID=$(cloudkitty hashmap field list ${INSTANCE_SERVICE_ID} | grep flavor_name | awk '{print $4}')
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t2.nano 0.068 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t2.micro 0.136 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t2.small 0.272 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.nano 0.076 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.micro 0.152 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.small 0.304 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.medium 0.068 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.large 1.216 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.xlarge 2.432 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.2xlarge 4.864 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value t3.4xlarge 9.92 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value c5.xlarge 2.14 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value c5.2xlarge 1.4369 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value c5.4xlarge 3.0480 &
+        cloudkitty hashmap mapping create --field-id ${FLAVOR_NAME_FIELD_ID} --value c5.8xlarge 19.26 &
+        # cloudkitty hashmap field create ${INSTANCE_SERVICE_ID} subscription
+
+
+        # manila_share_size
+        cloudkitty hashmap service create manila_share_size
+        MANILA_SHARE_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep manila_share_size | awk '{print $4}')
+        cloudkitty hashmap field create ${MANILA_SHARE_SIZE_SERVICE_ID} share_type
+        SHARE_TYPE_FIELD_ID=$(cloudkitty hashmap field list ${MANILA_SHARE_SIZE_SERVICE_ID} | grep share_type | awk '{print $4}')
+        cloudkitty hashmap mapping create --field-id ${SHARE_TYPE_FIELD_ID} --value cephfs 0.0024 &
+        # cloudkitty hashmap field create ${MANILA_SHARE_SIZE_SERVICE_ID} subscription
+
+
+        # manila_share_snapshot_size
+        cloudkitty hashmap service create manila_share_snapshot_size
+        MANILA_SHARE_SNAPSHOT_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep manila_share_snapshot_size | awk '{print $4}')
+        cloudkitty hashmap field create ${MANILA_SHARE_SNAPSHOT_SIZE_SERVICE_ID} share_type
+        SHARE_TYPE_FIELD_ID=$(cloudkitty hashmap field list ${MANILA_SHARE_SNAPSHOT_SIZE_SERVICE_ID} | grep share_type | awk '{print $4}')
+        cloudkitty hashmap mapping create --field-id ${SHARE_TYPE_FIELD_ID} --value cephfs 0.0012 &
+        # cloudkitty hashmap field create ${MANILA_SHARE_SNAPSHOT_SIZE_SERVICE_ID} subscription
+
+        # volume_size
+        cloudkitty hashmap service create volume_size
+        VOLUME_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep volume_size | awk '{print $4}')
+        cloudkitty hashmap field create ${VOLUME_SIZE_SERVICE_ID} volume_type
+        VOLUME_TYPE_FIELD_ID=$(cloudkitty hashmap field list ${VOLUME_SIZE_SERVICE_ID} | grep volume_type | awk '{print $4}')
+        cloudkitty hashmap mapping create --field-id ${VOLUME_TYPE_FIELD_ID} --value ssd 0.0012
+        cloudkitty hashmap mapping create --field-id ${VOLUME_TYPE_FIELD_ID} --value hdd 0.0005 &
+        # cloudkitty hashmap field create ${VOLUME_SIZE_SERVICE_ID} subscription
+
+        # volume_snapshot_size
+        cloudkitty hashmap service create volume_snapshot_size
+        VOLUME_SNAPSHOT_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep volume_snapshot_size | awk '{print $4}')
+        cloudkitty hashmap field create ${VOLUME_SNAPSHOT_SIZE_SERVICE_ID} volume_type
+        VOLUME_TYPE_FIELD_ID=$(cloudkitty hashmap field list ${VOLUME_SNAPSHOT_SIZE_SERVICE_ID} | grep volume_type | awk '{print $4}')
+        cloudkitty hashmap mapping create --field-id ${VOLUME_TYPE_FIELD_ID} --value ssd 0.0006
+        cloudkitty hashmap mapping create --field-id ${VOLUME_TYPE_FIELD_ID} --value hdd 0.0002 &
+        # cloudkitty hashmap field create ${VOLUME_SNAPSHOT_SIZE_SERVICE_ID} subscription
+
+        # image_size
+        cloudkitty hashmap service create image_size
+        IMAGE_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep image_size | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${IMAGE_SIZE_SERVICE_ID} 0.0003 &
+
+        # octavia_lb_loadbalancer
+        cloudkitty hashmap service create octavia_lb_loadbalancer
+        OCTAVIA_LB_LOADBALANCER_SERVICE_ID=$(cloudkitty hashmap service list | grep octavia_lb_loadbalancer | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${OCTAVIA_LB_LOADBALANCER_SERVICE_ID} 0.500 &
+
+        # network_services_firewall_group
+        cloudkitty hashmap service create network_services_firewall_group
+        NETWORK_SERVICES_FIREWALL_GROUP_SERVICE_ID=$(cloudkitty hashmap service list | grep network_services_firewall_group | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${NETWORK_SERVICES_FIREWALL_GROUP_SERVICE_ID} 0.030 &
+
+        # network_services_vpn
+        cloudkitty hashmap service create network_services_vpn
+        NETWORK_SERVICES_VPN_SERVICE_ID=$(cloudkitty hashmap service list | grep network_services_vpn | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${NETWORK_SERVICES_VPN_SERVICE_ID} 0.300 &
+
+        # radosgw_objects_size
+        cloudkitty hashmap service create radosgw_objects_size
+        RADOSGW_OBJECTS_SIZE_SERVICE_ID=$(cloudkitty hashmap service list | grep radosgw_objects_size | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${RADOSGW_OBJECTS_SIZE_SERVICE_ID} 0.322 &
+
+        # network_floatingip_bandwidth
+        cloudkitty hashmap service create network_floatingip_bandwidth
+        NETWORK_FLOATINGIP_BANDWIDTH_SERVICE_ID=$(cloudkitty hashmap service list | grep network_floatingip_bandwidth | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${NETWORK_FLOATINGIP_BANDWIDTH_SERVICE_ID} 0.800 &
+
+        # network_router_bandwidth
+        cloudkitty hashmap service create network_router_bandwidth
+        NETWORK_ROUTER_BANDWIDTH_SERVICE_ID=$(cloudkitty hashmap service list | grep network_router_bandwidth | awk '{print $4}')
+        cloudkitty hashmap mapping create --service-id ${NETWORK_ROUTER_BANDWIDTH_SERVICE_ID} 0.800 &
+    fi
+    touch ${LOCK_DIR}/cloudkitty.lock
+else
+    echo ${LOCK_DIR}/cloudkitty.lock exists, skipping...
+fi
+
+
+cat << EOF
+#  ██████╗  ██████╗ ███╗   ██╗███████╗
+#  ██╔══██╗██╔═══██╗████╗  ██║██╔════╝
+#  ██║  ██║██║   ██║██╔██╗ ██║█████╗
+#  ██║  ██║██║   ██║██║╚██╗██║██╔══╝
+#  ██████╔╝╚██████╔╝██║ ╚████║███████╗
+#  ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+EOF

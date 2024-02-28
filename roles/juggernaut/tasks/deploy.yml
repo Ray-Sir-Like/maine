@@ -1,0 +1,15 @@
+---
+- import_tasks: register.yml
+  when: inventory_hostname in groups['juggernaut-api']
+
+- import_tasks: prepare.yml
+
+- import_tasks: config.yml
+
+- import_tasks: check-containers.yml
+
+- import_tasks: bootstrap.yml
+  when: inventory_hostname in groups['juggernaut-api']
+
+- name: Flush handlers
+  meta: flush_handlers

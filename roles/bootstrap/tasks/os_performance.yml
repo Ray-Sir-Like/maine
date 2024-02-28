@@ -1,0 +1,31 @@
+---
+- name: Ensure ip_conntrack kernel module
+  modprobe:
+    name: ip_conntrack
+    state: present
+
+- name: Configure os kernel settings
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+  with_dict: "{{ os_kernel_settings }}"
+
+- name: Install and Configure Performance Tuning
+  block:
+    - name: install tuned package
+      package:
+        name: tuned
+        state: present
+
+    - name: start and enable tuned
+      service:
+        name: tuned
+        state: restarted
+        enabled: yes
+
+    - name: setting tuned profile
+      shell: tuned-adm profile {{ os_tuned_profile }}
+  when:
+    - not disable_configure_tuned_profile | bool

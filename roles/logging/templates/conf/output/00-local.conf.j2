@@ -1,0 +1,37 @@
+{% for item in syslog_facilities | selectattr('enabled') %}
+<match syslog.{{ item.facility }}.**>
+  @type copy
+{% if log_direct_to_opensearch %}
+  <store>
+       @type opensearch
+       host {{ logging_opensearch_address }}
+       port {{ logging_opensearch_port }}
+       scheme {{ fluentd_opensearch_scheme }}
+{% if fluentd_opensearch_path != '' %}
+       path {{ fluentd_opensearch_path }}
+{% endif %}
+{% if fluentd_opensearch_scheme == 'https' %}
+       ssl_version {{ fluentd_opensearch_ssl_version }}
+       ssl_verify {{ fluentd_opensearch_ssl_verify }}
+{% if fluentd_opensearch_cacert | length > 0 %}
+       ca_file {{ fluentd_opensearch_cacert }}
+{% endif %}
+{% endif %}
+{% if fluentd_opensearch_user != '' and fluentd_opensearch_password != ''%}
+       user {{ fluentd_opensearch_user }}
+       password {{ fluentd_opensearch_password }}
+{% endif %}
+       logstash_format true
+       logstash_prefix {{ logging_opensearch_log_index_prefix }}
+       reconnect_on_error true
+       request_timeout {{ fluentd_opensearch_request_timeout }}
+       suppress_type_name true
+       <buffer>
+         @type file
+         path /var/lib/td-agent/data/opensearch.buffer/{{ item.facility }}.*
+         flush_interval 15s
+       </buffer>
+    </store>
+{% endif %}
+</match>
+{% endfor %}

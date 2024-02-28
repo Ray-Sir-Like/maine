@@ -1,0 +1,526 @@
+{
+   "annotations": {
+      "list": [ ]
+   },
+   "editable": false,
+   "gnetId": null,
+   "graphTooltip": 0,
+   "id": null,
+   "links": [ ],
+   "panels": [
+      {
+         "datasource": null,
+         "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 2,
+         "styles": [
+            {
+               "alias": "实例",
+               "colorMode": null,
+               "pattern": "addr",
+               "type": "string",
+               "unit": "short"
+            },
+            {
+               "alias": "主机",
+               "colorMode": null,
+               "pattern": "instance",
+               "type": "string",
+               "unit": "short"
+            },
+            {
+               "alias": "运行时间",
+               "colorMode": null,
+               "decimals": 2,
+               "pattern": "Value",
+               "type": "number",
+               "unit": "s"
+            },
+            {
+               "alias": "",
+               "colorMode": null,
+               "pattern": "/.*/",
+               "preserveFormat": true,
+               "sanitize": false,
+               "type": "hidden"
+            }
+         ],
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "redis_uptime_in_seconds",
+               "format": "table",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "",
+               "refId": "A"
+            }
+         ],
+         "title": "服务运行时间",
+         "transform": "table",
+         "type": "table"
+      },
+      {
+         "datasource": null,
+         "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 3,
+         "styles": [
+            {
+               "alias": "实例",
+               "colorMode": null,
+               "pattern": "addr",
+               "type": "string",
+               "unit": "short"
+            },
+            {
+               "alias": "主机",
+               "colorMode": null,
+               "pattern": "instance",
+               "type": "string",
+               "unit": "short"
+            },
+            {
+               "alias": "连接数",
+               "colorMode": null,
+               "decimals": 0,
+               "pattern": "Value",
+               "type": "number",
+               "unit": "none"
+            },
+            {
+               "alias": "",
+               "colorMode": null,
+               "pattern": "/.*/",
+               "preserveFormat": true,
+               "sanitize": false,
+               "type": "hidden"
+            }
+         ],
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "redis_connected_clients",
+               "format": "table",
+               "instant": true,
+               "intervalFactor": 2,
+               "legendFormat": "",
+               "refId": "A"
+            }
+         ],
+         "title": "客户端连接数",
+         "transform": "table",
+         "type": "table"
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": null,
+         "fill": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 5
+         },
+         "id": 4,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 2,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "rate(redis_commands_processed_total[5m])",
+               "format": "time_series",
+               "interval": "1m",
+               "intervalFactor": 2,
+               "legendFormat": "{{instance}}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "命令执行速率",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "ops",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "ops",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": null,
+         "fill": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 13
+         },
+         "id": 5,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": true,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 2,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "redis_keyspace_hits_total/(redis_keyspace_hits_total+redis_keyspace_misses_total)*100",
+               "format": "time_series",
+               "interval": "1m",
+               "intervalFactor": 2,
+               "legendFormat": "{{instance}}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "缓存命中率",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "percent",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": null,
+         "fill": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 21
+         },
+         "id": 6,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 2,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "redis_memory_used_bytes ",
+               "format": "time_series",
+               "interval": "1m",
+               "intervalFactor": 2,
+               "legendFormat": "{{instance}}",
+               "refId": "A"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "实例内存使用",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "bytes",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      },
+      {
+         "aliasColors": { },
+         "bars": false,
+         "dashLength": 10,
+         "dashes": false,
+         "datasource": null,
+         "fill": 0,
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 29
+         },
+         "id": 7,
+         "legend": {
+            "alignAsTable": true,
+            "avg": false,
+            "current": true,
+            "max": true,
+            "min": false,
+            "rightSide": true,
+            "show": true,
+            "total": false,
+            "values": true
+         },
+         "lines": true,
+         "linewidth": 2,
+         "links": [ ],
+         "nullPointMode": "null",
+         "percentage": false,
+         "pointradius": 5,
+         "points": false,
+         "renderer": "flot",
+         "repeat": null,
+         "seriesOverrides": [ ],
+         "spaceLength": 10,
+         "stack": false,
+         "steppedLine": false,
+         "targets": [
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "rate(redis_net_input_bytes_total[5m])",
+               "format": "time_series",
+               "interval": "1m",
+               "intervalFactor": 2,
+               "legendFormat": "{{instance}}_input",
+               "refId": "A"
+            },
+            {
+               "datasource": "$PROMETHEUS_DS",
+               "expr": "rate(redis_net_output_bytes_total[5m])",
+               "format": "time_series",
+               "interval": "1m",
+               "intervalFactor": 2,
+               "legendFormat": "{{instance}}_output",
+               "refId": "B"
+            }
+         ],
+         "thresholds": [ ],
+         "timeFrom": null,
+         "timeShift": null,
+         "title": "网络带宽",
+         "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+         },
+         "type": "graph",
+         "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": [ ]
+         },
+         "yaxes": [
+            {
+               "format": "Bps",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            },
+            {
+               "format": "Bps",
+               "label": null,
+               "logBase": 1,
+               "max": null,
+               "min": null,
+               "show": true
+            }
+         ]
+      }
+   ],
+   "refresh": "30s",
+   "schemaVersion": 16,
+   "style": "dark",
+   "tags": [
+      "redis exporter"
+   ],
+   "templating": {
+      "list": [
+         {
+            "current": { },
+            "hide": 1,
+            "label": "数据源",
+            "name": "PROMETHEUS_DS",
+            "options": [ ],
+            "query": "prometheus",
+            "refresh": 1,
+            "regex": "/[^default]/",
+            "type": "datasource"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-6h",
+      "to": "now"
+   },
+   "timepicker": {
+      "refresh_intervals": [
+         "5s",
+         "10s",
+         "30s",
+         "1m",
+         "5m",
+         "15m",
+         "30m",
+         "1h",
+         "2h",
+         "1d"
+      ],
+      "time_options": [
+         "5m",
+         "15m",
+         "1h",
+         "6h",
+         "12h",
+         "24h",
+         "2d",
+         "7d",
+         "30d"
+      ]
+   },
+   "timezone": "browser",
+   "title": "Redis Cluster",
+   "version": 0
+}

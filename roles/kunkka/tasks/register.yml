@@ -1,0 +1,7 @@
+---
+- import_role:
+    name: service-ks-register
+  vars:
+    service_ks_register_auth: "{{ openstack_kunkka_auth }}"
+    service_ks_register_services: "{{ kunkka_ws_services }}"
+    service_ks_register_users: "{{ kunkka_ks_users }}"

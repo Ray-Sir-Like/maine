@@ -1,0 +1,35 @@
+actions:
+  1:
+    action: close
+    description: >-
+      Closes indices
+    options:
+      ignore_empty_list: True
+      # NOTE(hzw): Fix exception `'Indicesclient' object has no attribute 'flush_synced'`.
+      skip_flush: True
+    filters:
+    - filtertype: pattern
+      kind: prefix
+      value: "{{ logging_opensearch_curator_index_pattern }}"
+    - filtertype: age
+      source: name
+      direction: older
+      timestring: '%Y.%m.%d'
+      unit: days
+      unit_count: "{{ logging_opensearch_curator_soft_retention_period_days }}"
+  2:
+    action: delete_indices
+    description: >-
+      Delete indicies
+    options:
+      ignore_empty_list: True
+    filters:
+    - filtertype: pattern
+      kind: prefix
+      value: "{{ logging_opensearch_curator_index_pattern }}"
+    - filtertype: age
+      source: name
+      direction: older
+      timestring: '%Y.%m.%d'
+      unit: days
+      unit_count: "{{ logging_opensearch_curator_hard_retention_period_days }}"

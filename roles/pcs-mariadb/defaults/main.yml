@@ -1,0 +1,10 @@
+---
+mariadb_force_update: 'no'
+
+mariadb_nodes_count: "{{ groups['mariadb'] | length }}"
+mariadb_pcs_resource_force_update: "{{ pcs_resource_force_update }}"
+mariadb_wsrep_cluster_address: "gcomm://{% if (groups['mariadb'] | length) > 1 %}{% for host in groups['mariadb'] %}{{ 'api' | kolla_address(host) | put_address_in_context('url') }}{% if not loop.last %},{% endif %}{% endfor %}{% endif %}"
+mariadb_cluster_host_map_string: "{% for host in groups['mariadb'] %}{{ hostvars[host]['ansible_hostname'] }}:{{ 'api' | kolla_address(host) | put_address_in_context('url') }}{% if not loop.last %};{% endif %}{% endfor %}"
+mariadb_two_node_mode: "{{ ' two_node_mode=true' if mariadb_nodes_count == 2 else '' }}"
+
+mariadb_promote_timeout: 300

@@ -1,0 +1,9 @@
+---
+- name: Ensure python cloudkittyclient
+  package:
+    name: "{{ cloudkittyclient }}"
+    state: present
+  tags:
+    - cloudkitty
+  when:
+    - with_os_client | bool

@@ -1,0 +1,39 @@
+# FIXME: if cfg3.pp can be created by heat-template-plugin
+heat_tempest_plugin.tests.scenario.test_aodh_alarm.AodhAlarmTest.test_alarm[id-fc0f18a6-f65c-4df1-b9c5-e160dea59849]: deprecated gnocchi in latest version
+heat_tempest_plugin.tests.scenario.test_volumes.VolumeBackupRestoreIntegrationTest.test_cinder_volume_create_backup_restore[id-c3416735-87bf-4478-85c5-b3823819eb19]: no any update for output after stack update, volume status 'in-use' != u'available'
+^heat_tempest_plugin.tests.scenario.test_server_software_config: not frequently used
+^heat_tempest_plugin.tests.scenario.test_server_signal: not frequently used
+^heat_tempest_plugin.tests.scenario.test_server_cfn_init: not frequently used
+^heat_tempest_plugin\.tests\.api: skip heat api tests since heat is not frequently used now
+^heat_tempest_plugin\.tests\.functional: skip heat finctional tests since heat is not frequently used now
+^manila_tempest_tests\.tests\.api: skip manila api test since tempest code does not support backend_name for share_type
+# https://tracker.ceph.com/issues/46844
+manila_tempest_tests.tests.scenario.test_share_shrink.TestBaseShareShrinkScenarioCEPHFS.test_create_shrink_and_write_with_ceph_fuse_client: skip because of ceph-fuse bug
+mistral_tempest_tests.tests.scenario.engine.actions.v2.test_ssh_actions.SSHActionsTestsV2.test_run_ssh_action[id-3e12a2ad-5b10-46b0-ae1f-ed34d3cc6ae2,sanity]: Failed to execute ssh cmd issue
+mistral_tempest_tests.tests.api.v2.test_action_executions.ActionExecutionTestsV2.test_run_action_std_http_error[id-befa9b1c-01a4-41bc-b060-88cb1b147dfb,sanity]: http resp.status bug
+mistral_tempest_tests.tests.scenario.engine.actions.v2.test_ssh_actions.SSHActionsTestsV2.test_run_ssh_proxied_action[id-6c09fb04-70b4-43a6-b5f8-a53ca92e66e0,sanity]: Failed to execute ssh cmd issue
+mistral_tempest_tests.tests.scenario.engine.actions.v2.test_openstack_actions.OpenStackActionsTestsV2.test_swift_actions[id-985c1051-cf2e-4fd0-8ceb-a9b8110597a1,openstack]: swift disabled by default
+mistral_tempest_tests.tests.scenario.engine.actions.v2.test_openstack_actions.OpenStackActionsTestsV2.test_zaqar_actions[id-6f000ae8-3f41-49bd-b7a7-ad2256d80076,openstack]: need a zaqar test queue before running the test
+mistral_tempest_tests.tests.scenario.engine.actions.v2.test_multi_vim_authentication.MultiVimActionsTests.test_multi_vim_support_target_headers[id-dadc9960-9c03-41a9-9a9d-7e97d527e6dd,openstack]: incompatible with v3_auth_url {}://{}/identity/v3/, fixme when using openstack train
+barbican_tempest_plugin.tests.scenario.test_image_signing.ImageSigningTest.test_signed_image_upload_boot_failure[compute,id-74f022d6-a6ef-4458-96b7-541deadacf99,image]: ceph don't support change signature
+barbican_tempest_plugin.tests.scenario.test_certificate_validation.CertificateValidationTest.test_signed_image_invalid_cert_boot_failure: during failure ceph rbd watcher is still there before stream object timeout
+barbican_tempest_plugin.tests.scenario.test_volume_encryption.VolumeEncryptionTest.test_encrypted_cinder_volumes_cryptsetup[compute,id-cbc752ed-b716-4727-910f-956ccf965723,image,volume]: ceph does not support plain cryptsetup
+tempest.scenario.test_encrypted_cinder_volumes.TestEncryptedCinderVolumes.test_encrypted_cinder_volumes_cryptsetup[compute,id-cbc752ed-b716-4717-910f-956cce965722,image,slow,volume]: ceph does not support plain cryptsetup
+tempest.api.network.test_security_groups_negative.NegativeSecGroupTest.test_create_security_group_rule_with_invalid_ports: skip test because of i18n issue
+^ironic_tempest_plugin\.tests: skip ironic tests since ironic need fake-hardware driver
+^watcherclient\.tests: skip watchclient functional tests since watch is not deployed in current release
+^zaqar_tempest_plugin\.tests\.v1: skip zaqar v1 api since uosp uses v2 api
+zaqar_tempest_plugin.tests.v2.test_subscriptions.TestSubscriptions.test_trust_subscription[id-ff4344b4-ba78-44c5-9ffc-44e53e484f76]: skip zaqar trust subscription
+cloudkitty_tempest_plugin.tests.api.v1.test_cloudkitty_api.CloudkittyPrimaryAPITest.test_get_storage_dataframes: skip cloudkitty storage v1 api tests since uosp uses v2 api
+cloudkitty_tempest_plugin.tests.api.v1.test_cloudkitty_api.CloudkittyPrimaryAPITest.test_report_summary: skip cloudkitty storage v1 api tests since uosp uses v2 api
+cloudkitty_tempest_plugin.tests.api.v1.test_cloudkitty_api.CloudkittyPrimaryAPITest.test_report_total: skip cloudkitty storage v1 api tests since uosp uses v2 api
+neutron_tempest_plugin.fwaas.api.test_fwaasv2_extensions.FWaaSv2ExtensionTestJSON.test_default_fwg_created_on_list_firewall_groups: uosp don't use the default firewall group
+neutron_tempest_plugin.api.admin.test_shared_network_extension.RBACSharedNetworksTest.test_rbac_policy_quota: Unlimited rbac_policy_quota
+^masakari_tempest_plugin.tests: run vmha test alone
+octavia_tempest_plugin.tests.barbican_scenario.v2.test_tls_barbican.TLSWithBarbicanTest.test_http_2_tls_traffic: Skip because of bug https://storyboard.openstack.org/#!/story/2010902
+octavia_tempest_plugin.tests.barbican_scenario.v2.test_tls_barbican.TLSWithBarbicanTest.test_http_1_1_tls_traffic: Skip because of bug https://storyboard.openstack.org/#!/story/2010902
+^telemetry_tempest_plugin: skip telemetry test
+tempest.api.compute.admin.test_server_external_events.ServerExternalEventsTest.test_volume_assisted_snapshot_create_delete: Skip because of bug https://review.opendev.org/q/topic:%22bp/policy-service-role-default%22
+tempest.api.compute.admin.test_server_external_events.ServerExternalEventsTest.test_create_server_external_events: Skip because of bug https://review.opendev.org/q/topic:%22bp/policy-service-role-default%22
+tempest.api.network.test_security_groups_negative.NegativeSecGroupIPv6Test.test_create_security_group_rule_with_invalid_ports: Skip because of mismatch between Chinese and English
+tempest.api.network.test_security_groups_negative.NegativeSecGroupIPv6Test.test_create_security_group_rule_wrong_ip_prefix_version: Skip because of mismatch between Chinese and English

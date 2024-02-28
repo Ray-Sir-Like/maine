@@ -1,0 +1,37 @@
+weekly
+
+rotate 6
+
+copytruncate
+
+compress
+
+delaycompress
+
+notifempty
+
+missingok
+
+minsize 30M
+
+maxsize 100M
+
+su root kolla
+
+{% for service_name in cron_logrotate_enabled_services %}
+{% if service_name == 'ansible'%}
+"/var/log/kolla/ansible.log"
+{% else %}
+"/var/log/kolla/{{ service_name }}/*.log"
+{% endif %}
+{% if service_name == 'neutron' %}
+{
+    postrotate
+        chmod 644 /var/log/kolla/neutron/*.log
+    endscript
+}
+{% else %}
+{
+}
+{% endif %}
+{% endfor %}

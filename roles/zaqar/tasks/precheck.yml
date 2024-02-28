@@ -1,0 +1,56 @@
+---
+- name: Get container facts
+  kolla_container_facts:
+    name:
+      - zaqar
+  register: container_facts
+
+- name: Checking free port for Zaqar
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ zaqar_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['zaqar'] is not defined
+    - inventory_hostname in groups['zaqar']
+
+- name: Zaqar configuration sanity check
+  block:
+    - name: Zaqar check for zaqar stmp configuration
+      fail:
+        msg: "stmp server must be manually configured
+          in `/etc/maine/globals.yml`"
+      when: >
+        zaqar_smtp_hostname is not defined or
+        zaqar_smtp_port is not defined or
+        zaqar_smtp_username is not defined or
+        zaqar_smtp_password is not defined or
+        zaqar_smtp_secure is not defined or
+        zaqar_smtp_sender is not defined
+
+    - name: Zaqar check for zaqar email template configuration
+      fail:
+        msg: "zaqar_email_corperation_name, zaqar_email_logo_url,
+          zaqar_email_home_link must be manually configured in
+          `/etc/maine/globals.yml`"
+      when: >
+        zaqar_email_corperation_name is not defined or
+        zaqar_email_logo_url is not defined or
+        zaqar_email_home_link is not defined
+
+    - name: Zaqar check for zaqar sms dependency service
+      fail:
+        msg: "nuntius must be enabled for zaqar sms notification"
+      when: not enable_nuntius | bool
+
+    # (TODO): sms aliyun configuration
+    - name: Zaqar check for nuntius sms configuration
+      fail:
+        msg: "nuntius sms hl95  must be manually enabled and configured"
+      when: >
+        enable_nuntius_hl95 | bool and
+        (nuntius_hl95_username is not defined or
+        nuntius_hl95_password is not defined or
+        nuntius_hl95_epid is not defined)

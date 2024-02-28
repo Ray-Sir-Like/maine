@@ -1,0 +1,17 @@
+---
+- name: Use set_facts vars override include vars
+  set_fact:
+    mariadb_image: "{{ mariadb_image }}"
+    mariabackup_image: "{{ mariabackup_image }}"
+    mariadb_clustercheck_image: "{{ mariadb_clustercheck_image }}"
+
+- include_vars: "/usr/share/kolla-ansible/ansible/roles/mariadb/defaults/main.yml"
+
+- name: Group MariaDB hosts based on shards
+  add_host:
+    name: "{{ item }}"
+    groups: "{{ hostvars[item]['mariadb_shard_group'] }}"
+  loop: "{{ groups['mariadb'] }}"
+  changed_when: false
+
+- include_tasks: "{{ kolla_action }}.yml"

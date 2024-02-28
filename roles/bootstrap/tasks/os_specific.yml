@@ -1,0 +1,173 @@
+---
+- name: Support Kylin OS
+  block:
+    - name: Change os release
+      replace:
+        path: '/etc/os-release'
+        regexp: 'NAME=.*$'
+        replace: 'NAME="RedHat"'
+
+    - name: Change os version
+      replace:
+        path: '/etc/os-release'
+        regexp: 'VERSION_ID=.*$'
+        replace: 'VERSION_ID="10"'
+  when:
+    - ansible_distribution == 'Kylin Linux Advanced Server'
+
+- name: Configure Yum Repository
+  block:
+    - name: Remove all repofiles before
+      shell: >
+        rm -f /etc/yum.repos.d/*.repo
+      args:
+        warn: no
+      become: True
+
+    - name: Check if uos repo existed
+      stat:
+        path: "/var/www/html/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/uos7"
+      delegate_to: localhost
+      register: uos_repo
+
+    - name: Check if uds repo existed
+      stat:
+        path: "/var/www/html/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/uds3"
+      delegate_to: localhost
+      register: uds_repo
+
+    - name: Generate product repo configuration
+      template:
+        src: "ustack.repo.j2"
+        dest: "/etc/yum.repos.d/ustack.repo"
+      become: True
+  when: not disable_local_repository | bool
+
+- name: Dispatch U-binary to /usr/local/bin
+  block:
+    - name: Ensure Tar Installed
+      package:
+        name: tar
+        state: present
+      become: True
+
+    - name: Unarchive U-binary to /usr/local/bin
+      unarchive:
+        src: "{{ repo_baseurl }}/ubinary-{{ ansible_architecture }}.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: yes
+
+    # TODO(Yao Ning): unarchive binary to /usr/local/bin is better
+    # However, ansible default env doesn't include it, fix it latter
+    - name: Create Soft link for docker
+      file:
+        src: /usr/local/bin/docker
+        dest: /usr/bin/docker
+        state: link
+
+- name: Configure nameservers
+  template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+  become: True
+
+- name: Configure timezone and RTC
+  timezone:
+    name: "{{ os_timezone }}"
+    hwclock: UTC
+  become: True
+
+- name: Stopping Unused system services
+  block:
+    # Note(Yao Ning): ntp service should be provided by chronyd.service
+    - name: stop and disable ntp service
+      service:
+        name: ntpd
+        state: stopped
+        enabled: no
+      ignore_errors: True
+      become: True
+
+    - name: remove chrony containers
+      kolla_docker:
+        name: chrony
+        action: remove_container
+      ignore_errors: True
+      become: True
+  when: not disable_auto_stopping_system_services | bool
+
+# FIXME(Yao Ning): networking infrastructure, sometimes may not be used, but install anywway
+- name: Install and Configure Openvswitch Service
+  block:
+    - name: Install openvswitch package
+      package:
+        name: openvswitch
+        state: present
+      become: True
+
+    - name: start and enable openvswitch service
+      service:
+        name: openvswitch
+        state: started
+        enabled: yes
+      become: True
+  when:
+    - not disable_configure_openvswitch_services | bool
+    - product_mode == 'uos'
+
+- name: Install and Start network Service
+  block:
+    # # Note(Yao Ning): network should be managed by network.service
+    # # Note(Yao Ning): os-net-config support currently network.service
+    # # NetworkManager can also existed
+    # - name: stop and disable NetworkManager
+    #   service:
+    #     name: NetworkManager
+    #     state: stopped
+    #     enabled: no
+    #   ignore_errors: True
+    #   become: True
+
+    - name: install network service package
+      package:
+        name: network-scripts
+        state: present
+      become: True
+
+    - name: start and enable network service
+      service:
+        name: network
+        state: started
+        enabled: yes
+      become: True
+  when: not disable_auto_stopping_system_services | bool
+
+- name: Install and Configure Time Synchronization
+  block:
+    - name: Install chrony package
+      package:
+        name: chrony
+        state: present
+      become: True
+
+    - name: Copying over chrony.conf
+      template:
+        src: "chrony.conf.j2"
+        dest: "/etc/chrony.conf"
+        mode: "0660"
+      become: True
+
+    - name: Enable and restart chrony service
+      systemd:
+        name: chronyd
+        state: restarted
+        enabled: yes
+      become: True
+
+- name: Install UDS OS Based Packages
+  package:
+    name:
+      - python3
+      - lvm2
+    state: present
+  become: True

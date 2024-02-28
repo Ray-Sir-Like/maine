@@ -1,0 +1,107 @@
+#jinja2: trim_blocks: False
+[DEFAULT]
+host = {{ api_interface_address }}
+port = {{ kunkka_listen_port }}
+admin = {{ kunkka_is_admin | bool }}
+
+[database]
+url = mysql://{{ kunkka_database_user }}:{{ kunkka_database_password }}@{{ kunkka_database_address }}:{{ kunkka_database_port }}/{{ kunkka_database_name }}
+
+[cache]
+{% if enable_kunkka_external_redis | bool %}
+# NOTE(Xing Zhang): Only support one host, do not use in production.
+url = redis://:{{ kunkka_external_redis_password }}@{{ kunkka_external_redis_host }}:{{ kunkka_external_redis_port }}?db={{ kunkka_redis_db }}
+{% else %}
+# NOTE(Xing Zhang): Remove redis username and use kunkka_redis_db other than db 0 than redis_connection_string.
+url = redis://{% for host in groups['redis'] %}{% if host == groups['redis'][0] %}{{ redis_master_password }}@{{ 'api' | kolla_address(host) | put_address_in_context('url') }}:{{ redis_sentinel_port }}?sentinel=kolla{% else %}&sentinel_fallback={{ 'api' | kolla_address(host) | put_address_in_context('url') }}:{{ redis_sentinel_port }}{% endif %}{% endfor %}&db={{ kunkka_redis_db }}&socket_timeout=60&retry_on_timeout=yes
+{% endif %}
+
+[nuntius]
+url = '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}'
+sms_receiver = sms
+email_receiver = email
+
+[templates]
+sms_path = ./templates/sms.tmpl
+
+email_path = ./templates/email.tmpl
+email_logo = {{ kunkka_email_logo }}
+email_company = TFCloud
+
+[alipay]
+{% if kunkka_pay.alipay.is_prod is defined %}is_prod = {{ kunkka_pay.alipay.is_prod }}{% endif %}
+{% if kunkka_pay.alipay.app_id is defined %}app_id = {{ kunkka_pay.alipay.app_id }}{% endif %}
+{% if kunkka_pay.alipay.app_private_key is defined %}app_private_key = {{ kunkka_pay.alipay.app_private_key }}{% endif %}
+{% if kunkka_pay.alipay.alipay_public_key is defined %}alipay_public_key = {{ kunkka_pay.alipay.alipay_public_key }}{% endif %}
+
+[keystone]
+url = {{ kunkka_keystone_url }}
+endpoint_type = {{ kunkka_keystone_endpoint_type }}
+domain = {{ default_project_domain_name }}
+username = {{ kunkka_keystone_user }}
+password = {{ kunkka_keystone_password }}
+project_name = service
+
+[register]
+auto_accept = false
+admin_email = {{ kunkka_admin_email }}
+member_role_name = member
+
+# legacy nodejs app config
+[session]
+max_age = {{ kunkka_session_max_age }}
+renew = {{ kunkka_session_renew | bool }}
+
+[logo]
+{% if kunkka_generic_logo_file is defined %}generic = /static/assets/custom/{{ kunkka_generic_logo_file }}{% endif %}
+{% if kunkka_navbar_logo_file is defined %}navbar = /static/assets/custom/{{ kunkka_navbar_logo_file }}{% endif %}
+{% if kunkka_favicon_logo_file is defined %}favicon = /static/assets/custom/{{ kunkka_favicon_logo_file }}{% endif %}
+{% if kunkka_background_logo_file is defined %}background = /static/assets/custom/{{ kunkka_background_logo_file }}{% endif %}
+
+[logger]
+dir = {{ kunkka_log_dir }}
+
+[rgw]
+access_key = {{ s3_system_access_key }}
+secret_key = {{ s3_system_secret_key }}
+
+[mq]
+remotes = {% for host in groups['rabbitmq'] %}{{ hostvars[host]['ansible_hostname'] }}{% if not loop.last %},{% endif %}{% endfor %}
+port = {{ rabbitmq_port }}
+username = {{ rabbitmq_user }}
+password = {{ rabbitmq_password }}
+heartbeat = {{ kunkka_rabbitmq_heartbeat }}
+source_exchanges = {{ kunkka_enabled_notification_topics | map(attribute='name') | join(',') }}
+reconnect_timeout = {{ kunkka_rabbitmq_reconnect_timeout }}
+max_timeout_limit = {{ kunkka_rabbitmq_max_timeout_limit }}
+
+[ticket]
+enabled = {{ kunkka_ticket_enabled | bool }}
+store_type = {{ kunkka_ticket_storage_type }}
+store_bucket = {{ kunkka_ticket_storage_bucket }}
+store_region = {{ kunkka_ticket_storage_region }}
+flows = {{ kunkka_ticket_flow_roles | join(',') }}
+
+[login_limit]
+online_limit = {{ kunkka_login_online_limit }}
+
+[urls]
+undercloud_prometheus_url = {{ kunkka_urls.undercloud_prometheus.url }}
+undercloud_prometheus_username = {{ kunkka_urls.undercloud_prometheus.username }}
+undercloud_prometheus_password = {{ kunkka_urls.undercloud_prometheus.password }}
+
+overcloud_prometheus_url = {{ kunkka_urls.overcloud_prometheus.url }}
+overcloud_prometheus_username = {{ kunkka_urls.overcloud_prometheus.username }}
+overcloud_prometheus_password = {{ kunkka_urls.overcloud_prometheus.password }}
+
+undercloud_grafana_url = {{ kunkka_urls.undercloud_grafana.url }}
+undercloud_grafana_username = {{ kunkka_urls.undercloud_grafana.username }}
+undercloud_grafana_password = {{ kunkka_urls.undercloud_grafana.password }}
+
+captain_url = {{ kunkka_urls.captain }}
+
+admin_guide_doc = {{ kunkka_urls.admin_guide_doc }}
+user_guide_doc = {{ kunkka_urls.user_guide_doc }}
+
+[tls]
+cafile = {{ openstack_cacert }}

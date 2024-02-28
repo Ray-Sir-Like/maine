@@ -1,0 +1,78 @@
+---
+- name: Ensure log directories exist
+  vars:
+    nginx_user: "{{ 'www-data' if is_debian else 'nginx' }}"
+    is_debian: "{{ kolla_base_distro in ['debian', 'ubuntu'] }}"
+  command: >
+     docker exec bifrost_deploy
+     bash -c 'mkdir -p /var/log/kolla/ironic &&
+     chown ironic:ironic /var/log/kolla/ironic &&
+     mkdir -p /var/log/kolla/ironic-inspector &&
+     chown ironic:ironic /var/log/kolla/ironic-inspector &&
+     mkdir -p /var/log/kolla/nginx &&
+     chown {{ nginx_user }}:{{ nginx_user }} /var/log/kolla/nginx'
+
+- name: Bootstrap bifrost (this may take several minutes)
+  command: >
+     docker exec bifrost_deploy
+     bash -c 'source /{{ user }}/openrc &&
+     ansible-playbook -vvvv -i /bifrost/playbooks/inventory/target
+     /bifrost/playbooks/install.yaml
+     -e @/etc/bifrost/bifrost.yml
+     -e skip_package_install=true'
+
+- name: Installing ssh keys
+  command: >
+     docker exec bifrost_deploy
+     bash -c 'mkdir -p /root/.ssh ; mkdir -p /home/ironic/.ssh;
+     cp -f /etc/bifrost/id_rsa /root/.ssh/id_rsa &&
+     cp -f /etc/bifrost/id_rsa.pub /root/.ssh/id_rsa.pub &&
+     cp -f /etc/bifrost/ssh_config /root/.ssh/config &&
+     cp -f /etc/bifrost/id_rsa /home/ironic/.ssh/id_rsa &&
+     cp -f /etc/bifrost/id_rsa.pub /home/ironic/.ssh/id_rsa.pub &&
+     cp -f /etc/bifrost/ssh_config /home/ironic/.ssh/config &&
+     chmod 600 /root/.ssh/id_rsa &&
+     chmod 600 /root/.ssh/id_rsa.pub &&
+     chmod 600 /root/.ssh/config &&
+     chmod 600 /home/ironic/.ssh/id_rsa &&
+     chmod 600 /home/ironic/.ssh/id_rsa.pub &&
+     chmod 600 /home/ironic/.ssh/config &&
+     chown ironic:ironic /home/ironic/.ssh/id_rsa &&
+     chown ironic:ironic /home/ironic/.ssh/id_rsa.pub &&
+     chown ironic:ironic /home/ironic/.ssh/config'
+
+- name: Copy ironic user images to bifrost_deploy httpboot dir
+  command: >
+     docker cp "{{ ironic_image_folder }}/{{ item }}" bifrost_deploy:/httpboot/
+  with_items:
+    - "{{ ironic_user_image_name | default([]) }}"
+    - "{{ ironic_aarch64_user_image_name | default([]) }}"
+    - "{{ ipa_kernel_name | default([]) }}"
+    - "{{ ipa_initramfs_name | default([]) }}"
+    - "{{ ipa_aarch64_kernel_name | default([]) }}"
+    - "{{ ipa_aarch64_initramfs_name | default([]) }}"
+
+- name: Copy ironic ipa images to bifrost_deploy tftpboot dir
+  command: >
+    docker cp "{{ ironic_image_folder }}/{{ item }}" bifrost_deploy:/tftpboot/
+  with_items:
+    - "{{ ipa_kernel_name | default([]) }}"
+    - "{{ ipa_initramfs_name | default([]) }}"
+    - "{{ ipa_aarch64_kernel_name | default([]) }}"
+    - "{{ ipa_aarch64_initramfs_name | default([]) }}"
+
+- name: Copy pxelinux.cfg.default to bifrost_deploy
+  command: >
+    docker cp "{{ node_config_directory }}/bifrost/pxelinux.cfg.default" bifrost_deploy:/tftpboot/pxelinux.cfg/default
+
+- name: Copy pxe files to tftpboot
+  command: >
+    docker exec bifrost_deploy
+    bash -c 'cp -ar /etc/bifrost/pxe/* /tftpboot/'
+
+- name: Create basic inspection rules for auto discovery
+  command: >
+    docker exec bifrost_deploy
+    bash -c 'export OS_CLOUD=bifrost &&
+    openstack baremetal introspection rule purge &&
+    openstack baremetal introspection rule import /etc/bifrost/discovery_rules.json'

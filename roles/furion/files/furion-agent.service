@@ -1,0 +1,10 @@
+[Unit]
+Description=Furion Agent
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/furion-agent --config /etc/furion/furion-agent.conf
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

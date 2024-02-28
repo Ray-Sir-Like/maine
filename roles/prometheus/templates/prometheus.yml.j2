@@ -1,0 +1,15 @@
+---
+global:
+  scrape_interval: 60s
+  scrape_timeout: 10s
+  evaluation_interval: 60s
+  external_labels:
+    monitor: 'kolla'
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+{% for host in groups['prometheus'] %}
+        - '{{ 'api' | kolla_address(host) | put_address_in_context('url') }}:{{ prometheus_port }}'
+{% endfor %}

@@ -1,0 +1,128 @@
+---
+groups:
+- name: haproxy_backend_current_queue
+  rules:
+  - alert: haproxy_backend_current_queue_more_than_100
+    expr: haproxy_backend_current_queue > 100
+    labels:
+      severity: warning
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前未分配的请求数超过 100，当前值：{{ $value }}"
+
+- name: haproxy_backend_current_session_rate
+  rules:
+  - alert: haproxy_backend_current_session_rate_more_than_1000
+    expr: haproxy_backend_current_session_rate > 1000
+    labels:
+      severity: warning
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前每秒创建的会话数超过 1000，当前值：{{ $value }}"
+
+- name: haproxy_backend_http_connect_average_time
+  rules:
+  - alert: haproxy_backend_http_connect_time_average_more_than_15
+    expr: haproxy_backend_http_connect_time_average_seconds > 15
+    labels:
+      severity: warning
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前平均连接时间超过 15，当前值：{{ $value }} 秒"
+  - alert: haproxy_backend_http_connect_time_average_more_than_30
+    expr: haproxy_backend_http_connect_time_average_seconds > 30
+    labels:
+      severity: major
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前平均连接时间超过 30，当前值：{{ $value }} 秒"
+
+- name: haproxy_backend_http_queue_average_time
+  rules:
+  - alert: haproxy_backend_http_queue_time_average_more_than_15
+    expr: haproxy_backend_http_queue_time_average_seconds > 15
+    labels:
+      severity: warning
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前队列平均排队时间超过 15，当前值：{{ $value }} 秒"
+  - alert: haproxy_backend_http_queue_time_average_more_than_30
+    expr: haproxy_backend_http_queue_time_average_seconds > 30
+    labels:
+      severity: major
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前队列平均排队时间超过 30，当前值：{{ $value }} 秒"
+
+- name: haproxy_backend_http_response_average_time
+  rules:
+  - alert: haproxy_backend_http_response_time_average_more_than_20
+    expr: haproxy_backend_http_response_time_average_seconds > 20
+    labels:
+      severity: warning
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前平均响应时间超过 20，当前值：{{ $value }} 秒"
+  - alert: haproxy_backend_http_response_time_average_more_than_30
+    expr: haproxy_backend_http_response_time_average_seconds > 30
+    labels:
+      severity: major
+    annotations:
+      description: "backend: {{ $labels.backend }} 当前平均响应时间超过 30，当前值：{{ $value }} 秒"
+
+- name: haproxy_backend_down
+  rules:
+  - alert: haproxy_backend_down
+    expr: haproxy_backend_up == 0
+    labels:
+      severity: major
+    annotations:
+      description: "backend：{{ $labels.backend }} 异常"
+
+- name: haproxy_frontend_current_session_rate
+  rules:
+  - alert: haproxy_frontend_current_session_rate_more_than_500
+    expr: haproxy_frontend_current_session_rate > 500
+    labels:
+      severity: warning
+    annotations:
+      description: "frontend: {{ $labels.frontend }} 当前每秒创建的会话数超过 500，当前值：{{ $value }}"
+  - alert: haproxy_frontend_current_session_rate_more_than_1000
+    expr: haproxy_frontend_current_session_rate > 1000
+    labels:
+      severity: major
+    annotations:
+      description: "frontend: {{ $labels.frontend }} 当前每秒创建的会话数超过 1000，当前值：{{ $value }}"
+
+# server
+- name: haproxy_server_current_queue
+  rules:
+  - alert: haproxy_server_current_queue_more_than_100
+    expr: haproxy_server_current_queue > 100
+    labels:
+      severity: warning
+    annotations:
+      description: "当前分配给 {{ $labels.server }}服务器 {{ $labels.backend }} 请求排队数超过 100，当前值：{{ $value }}"
+  - alert: haproxy_server_current_queue_more_than_300
+    expr: haproxy_server_current_queue > 300
+    labels:
+      severity: major
+    annotations:
+      description: "当前分配给 {{ $labels.server }}服务器的 {{ $labels.backend }}请求排队数超过 300，当前值：{{ $value }}"
+
+- name: haproxy_server_current_session_rate
+  rules:
+  - alert: haproxy_server_current_session_rate_more_than_500
+    expr: haproxy_server_current_session_rate > 500
+    labels:
+      severity: warning
+    annotations:
+      description: "当前每秒分配给 {{ $labels.server }}服务器 {{ $labels.backend }} 请求排队数超过 500，当前值：{{ $value }}"
+  - alert: haproxy_server_current_session_rate_more_than_1000
+    expr: haproxy_server_current_session_rate > 1000
+    labels:
+      severity: major
+    annotations:
+      description: "当前每秒分配给 {{ $labels.server }}服务器的 {{ $labels.backend }}请求排队数超过 1000，当前值：{{ $value }}"
+
+- name: haproxy_server_down
+  rules:
+  - alert: haproxy_server_down
+    expr: haproxy_server_up == 0
+    labels:
+      severity: major
+    annotations:
+      description: " {{ $labels.backend }}对接的服务器：{{ $labels.server }} 异常"

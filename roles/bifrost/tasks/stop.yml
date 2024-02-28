@@ -1,0 +1,20 @@
+---
+- block:
+    # Ensure that all services are stopped gracefully, and in a sensible
+    # order.
+    - name: Stop services gracefully
+      become: true
+      command: docker exec bifrost_deploy systemctl stop {{ item }}.service
+      with_items:
+        - ironic-api
+        - ironic-conductor
+        - ironic-inspector
+        - mariadb
+        - nginx
+
+    - name: Stopping bifrost_deploy container
+      become: true
+      kolla_docker:
+        action: "stop_container"
+        common_options: "{{ docker_common_options }}"
+        name: "bifrost_deploy"

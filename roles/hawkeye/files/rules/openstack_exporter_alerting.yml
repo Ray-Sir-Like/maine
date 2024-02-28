@@ -1,0 +1,11 @@
+---
+groups:
+- name: OpensSackAlerts
+  rules:
+    - alert: OpenStackServiceDown
+      expr: openstack_cinder_agent_state == 0 or openstack_neutron_agent_state == 0 or openstack_nova_agent_state == 0
+      for: 5m
+      labels:
+        severity: major
+      annotations:
+        description: "节点 {{ $labels.hostname }} 的OpenStack服务 {{ $labels.service }} 异常"

@@ -1,0 +1,94 @@
+[DEFAULT]
+debug = {{ zaqar_logging_debug }}
+log_dir=/var/log/kolla/zaqar
+log_file = /var/log/kolla/zaqar/zaqar-server.log
+auth_strategy = keystone
+
+[transport]
+subscriber_types = http,https,mailto,trust+http,trust+https,smsto
+
+[drivers]
+# Transport driver to use. (string value)
+transport = wsgi
+
+# Storage driver to use as the messaging store. (string value)
+# Deprecated group/name - [drivers]/storage
+message_store = redis
+
+# Storage driver to use as the management store. (string value)
+management_store = redis
+
+[drivers:management_store:redis]
+uri = {{ zaqar_redis_uri }}
+
+[drivers:message_store:redis]
+uri = {{ zaqar_redis_uri }}
+
+[drivers:transport:wsgi]
+# Address on which the self-hosting server will listen. (host address value)
+bind = {{ api_interface_address }}
+port = {{ zaqar_listen_port }}
+
+[keystone_authtoken]
+www_authenticate_uri = {{ keystone_internal_url }}
+auth_url = {{ keystone_admin_url }}
+auth_type = password
+project_domain_id = {{ default_project_domain_id }}
+user_domain_id = {{ default_user_domain_id }}
+project_name = service
+username = {{ zaqar_keystone_user }}
+password = {{ zaqar_keystone_password }}
+cafile = {{ openstack_cacert }}
+memcache_security_strategy = ENCRYPT
+memcache_secret_key = {{ memcache_secret_key }}
+memcached_servers = {% for host in groups['memcached'] %}{{ 'api' | kolla_address(host) | put_address_in_context('memcache') }}:{{ memcached_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+[notification]
+sms_gateway = {{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/notify
+{% if enable_zaqar_notification | bool %}
+smtp_command = {{ zaqar_smtp_command }}
+max_notifier_workers = {{ openstack_service_rpc_workers }}
+require_confirmation = {{ zaqar_require_confirmation }}
+{% if zaqar_external_confirmation_url is defined %}
+external_confirmation_url = {{ zaqar_external_confirmation_url }}
+{% endif %}
+{% if zaqar_subscription_confirmation_email_template is defined %}
+subscription_confirmation_email_template = {{ zaqar_subscription_confirmation_email_template }}
+{% endif %}
+{% if zaqar_unsubscribe_confirmation_email_template is defined %}
+unsubscribe_confirmation_email_template = {{ zaqar_unsubscribe_confirmation_email_template }}
+{% endif %}
+{% endif %}
+
+[signed_url]
+{% if enable_zaqar_notification | bool %}
+secret_key = {{ zaqar_signed_url_secret_key }}
+{% endif %}
+
+[storage]
+{% if enable_zaqar_notification | bool %}
+message_pipeline = zaqar.notification.notifier
+{% endif %}
+
+[smtp_server]
+hostname = {{ zaqar_smtp_hostname }}
+port = {{ zaqar_smtp_port }}
+username = {{ zaqar_smtp_username }}
+password = {{ zaqar_smtp_password }}
+secure = {{ zaqar_smtp_secure }}
+sender = {{ zaqar_smtp_sender }}
+
+[oslo_messaging_notifications]
+transport_url = {{ notify_transport_url }}
+driver = messagingv2
+topics = zaqar
+
+[oslo_messaging_rabbit]
+heartbeat_in_pthread = false
+{% if om_enable_rabbitmq_tls | bool %}
+ssl = true
+ssl_ca_file = {{ om_rabbitmq_cacert }}
+{% endif %}
+{% if om_enable_rabbitmq_high_availability | bool %}
+amqp_durable_queues = true
+{% endif %}

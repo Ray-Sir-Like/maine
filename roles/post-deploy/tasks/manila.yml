@@ -1,0 +1,9 @@
+---
+- name: Ensure python manilaclient
+  package:
+    name: "{{ manilaclient }}"
+    state: present
+  tags:
+    - manila
+  when:
+    - with_os_client | bool

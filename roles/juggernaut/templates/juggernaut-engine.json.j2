@@ -1,0 +1,29 @@
+{
+    "command": "juggernaut-engine --config-file /etc/juggernaut/juggernaut.conf",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/juggernaut.conf",
+            "dest": "/etc/juggernaut/juggernaut.conf",
+            "owner": "juggernaut",
+            "perm": "0600"
+        }{% if juggernaut_policy_file is defined %},
+        {
+            "source": "{{ container_config_directory }}/{{ juggernaut_policy_file }}",
+            "dest": "/etc/juggernaut/{{ juggernaut_policy_file }}",
+            "owner": "juggernaut",
+            "perm": "0600"
+        }{% endif %}
+    ],
+    "permissions": [
+        {
+            "path": "/var/lib/juggernaut",
+            "owner": "juggernaut:juggernaut",
+            "recurse": true
+        },
+        {
+            "path": "/var/log/kolla/juggernaut",
+            "owner": "juggernaut:juggernaut",
+            "recurse": true
+        }
+    ]
+}

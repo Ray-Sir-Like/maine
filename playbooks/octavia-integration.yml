@@ -1,0 +1,85 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Setup Redis Haproxy for Octavia
+  gather_facts: false
+  vars:
+    octavia_haproxy_members: "{% for host in groups['redis'] %} server {{ hostvars[host].ansible_facts.hostname }} {{ 'api' | kolla_address(host) }}:{{ redis_sentinel_port }} check inter 1000;{% endfor %}"
+    octavia_redis_ha_services:
+      redis_sentinel:
+        enabled: true
+        haproxy:
+          redis_sentinel:
+            enabled: "{{ enable_octavia|bool }}"
+            mode: "tcp"
+            port: "{{ redis_sentinel_port }}"
+            listen_port: "{{ redis_sentinel_port }}"
+            custom_member_list: "{{ octavia_haproxy_members.split(';') }}"
+  hosts:
+    - haproxy
+  roles:
+    - { role: haproxy,
+        tags: octavia,
+        when: enable_haproxy | bool }
+  tasks:
+    # Octavia persistent only support only one redis host
+    - name: "Configure haproxy for Redis Sentinel"
+      import_role:
+        role: haproxy-config
+      vars:
+        project_services: "{{ octavia_redis_ha_services }}"
+      tags: always
+
+- name: OpenStack Octivia Integration
+  hosts: haproxy
+  vars_files:
+    - "/usr/share/kolla-ansible/ansible/roles/octavia/defaults/main.yml"
+  gather_facts: false
+  tags: octavia
+  tasks:
+    - name: Creating Octavia persistence database
+      become: true
+      kolla_toolbox:
+        module_name: mysql_db
+        module_args:
+          login_host: "{{ database_address }}"
+          login_port: "{{ database_port }}"
+          login_user: "{{ database_user }}"
+          login_password: "{{ database_password }}"
+          name: "{{ octavia_database_name }}_persistence"
+      run_once: True
+      delegate_to: "{{ groups['octavia-api'][0] }}"
+      when:
+        - not use_preconfigured_databases | bool
+
+    - name: Creating Octavia persistence database user and setting permissions
+      become: true
+      kolla_toolbox:
+        module_name: mysql_user
+        module_args:
+          login_host: "{{ database_address }}"
+          login_port: "{{ database_port }}"
+          login_user: "{{ database_user }}"
+          login_password: "{{ database_password }}"
+          name: "{{ octavia_database_user }}"
+          password: "{{ octavia_database_password }}"
+          host: "%"
+          priv: "{{ octavia_database_name }}_persistence.*:ALL"
+          append_privs: "yes"
+      run_once: True
+      delegate_to: "{{ groups['octavia-api'][0] }}"
+      when:
+        - not use_preconfigured_databases | bool
+
+- hosts: deployment
+  tasks:
+  - name: Replace openvswitch_vswitchd container command
+    become: true
+    tags: octavia
+    replace:
+      path: /usr/share/kolla-ansible/ansible/roles/octavia/tasks/hm-interface.yml
+      regexp: 'docker exec openvswitch_vswitchd ovs-vsctl'
+      replace: 'ovs-vsctl'
+    when:
+      - enable_octavia | bool
+      - octavia_network_type == "tenant"

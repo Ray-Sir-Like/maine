@@ -1,0 +1,20 @@
+---
+- name: Copy tools for /etc/bifrost/generate_servers.yml
+  template:
+    src: generate_servers.py.j2
+    dest: "{{ node_config_directory }}/bifrost/generate_servers.py"
+    mode: "0755"
+  become: true
+
+- name: Generate /etc/bifrost/servers.yml
+  command: >
+    docker exec bifrost_deploy
+    python /etc/bifrost/generate_servers.py
+
+- name: Deploy physical servers with ironic
+  command: >
+     docker exec bifrost_deploy
+     bash -c 'source /{{ user }}/openrc &&
+     export BIFROST_INVENTORY_SOURCE=/etc/bifrost/servers.yml &&
+     ansible-playbook -vvvv -i /bifrost/playbooks/inventory/bifrost_inventory.py
+     /bifrost/playbooks/deploy-dynamic.yaml -e @/etc/bifrost/bifrost.yml'

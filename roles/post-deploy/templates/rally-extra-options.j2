@@ -1,0 +1,202 @@
+[DEFAULT]
+tempest_host = {{ 'network' | kolla_address(groups['rally'][0]) }}
+
+[service_available]
+cinder = {{ enable_cinder | bool }}
+glance = {{ enable_glance | bool }}
+heat = {{ enable_heat | bool }}
+neutron = {{ enable_neutron | bool }}
+nova = {{ enable_nova | bool }}
+mistral = {{ enable_mistral | bool }}
+manila = {{ enable_manila | bool }}
+octavia = {{ enable_octavia | bool }}
+ceilometer = {{ enable_ceilometer | bool }}
+gnocchi = {{ enable_gnocchi | bool }}
+aodh = {{ enable_aodh | bool }}
+ironic = {{ enable_ironic | bool }}
+barbican = {{ enable_barbican | bool }}
+designate = {{ enable_designate | bool }}
+horizon = False
+swift = False
+sahara = False
+trove = {{ enable_trove | bool }}
+watcher = {{ enable_watcher | bool }}
+zaqar = {{ enable_zaqar | bool }}
+murano = {{ enable_murano | bool }}
+ec2api = False
+load_balancer = {{ enable_octavia | bool }}
+kuryr = {{ enable_kuryr | bool }}
+senlin = {{ enable_senlin | bool }}
+
+[compute]
+min_compute_nodes = 2
+min_microversion = 2.72
+max_microversion = 2.88
+fixed_network_name = rally-net
+build_timeout = 600
+
+[placement]
+min_microversion = 1.29
+max_microversion = 1.36
+
+[clustering]
+wait_timeout = 1200
+
+[compute-feature-enabled]
+allow_port_security_disabled = true
+disk_config = true
+api_extensions = all
+change_password = true
+console_output = true
+pause = true
+shelve = true
+suspend = true
+cold_migration = true
+live_migration = true
+snapshot = true
+scheduler_available_filters = all
+nova_cert = false
+personality = false
+config_drive = false
+swap_volume = true
+volume_backed_live_migration = false
+resize = true
+rebuild = true
+rescue = true
+block_migration_for_live_migration=false
+
+{% if enable_barbican | bool %}
+attach_encrypted_volume=True
+{% endif %}
+
+[identity-feature-enabled]
+trust = true
+api_v2 = false
+api_v2_admin = false
+api_v3 = true
+project_tags = true
+application_credentials = true
+
+{% if enable_barbican | bool %}
+[glance]
+verify_glance_signatures=True
+[loadbalancer_feature_enabled]
+terminated_tls_enabled = True
+{% endif %}
+
+[image-feature-enabled]
+api_v2 = true
+api_v1 = false
+
+[neutron_plugin_options]
+firewall_driver = openvswitch
+
+[network-feature-enabled]
+ipv6 = true
+floating_ips = true
+api_extensions = default-subnetpools,qos,availability_zone,network_availability_zone,auto-allocated-topology,ext-gw-mode,binding,agent,subnet_allocation,l3_agent_scheduler,external-net,standard-attr-tag,flavors,net-mtu,network-ip-availability,qos-default,quotas,revision-if-match,availability_zone_filter,l3-ha,provider,multi-provider,quota_details,vpnaas,address-scope,rbac-address-scope,extraroute,net-mtu-writable,empty-string-filtering,subnet-service-types,portforwarding,port-mac-address-regenerate,standard-attr-timestamp,service-type,qos-rule-type-details,port-security,extra_dhcp_opt,port-security-groups-filtering,standard-attr-revisions,pagination,sorting,vpn-endpoint-groups,security-group,dhcp_agent_scheduler,fip-port-details,vpn-flavors,router_availability_zone,rbac-policies,fwaas_v2,qos-bw-limit-direction,standard-attr-description,ip-substring-filtering,router,allowed-address-pairs,binding-extended,project-id,qos-fip
+port_security = true
+
+[image]
+build_timeout = 1200
+
+[volume]
+region = RegionOne
+volume_size = 4
+min_microversion = 3.42
+max_microversion = 3.64
+vendor_name = Open Source
+storage_protocol = ceph
+backend_names = ssd,hdd
+build_timeout = 1200
+manage_snapshot_ref = "source-name,snapshot-%s"
+
+[dns]
+nameservers = {{ kolla_external_vip_address }}
+
+[volume-feature-enabled]
+multi_backend = true
+backup = true
+api_v3 = True
+manage_snapshot = true
+manage_volume = true
+volume_revert = true
+extend_attached_volume = true
+
+[dns_feature_enabled]
+api_v1 = false
+api_v2 = true
+api_admin = false
+api_v2_quotas = true
+api_v2_quotas_verify_project = true
+
+
+[heat_plugin]
+stack_owner_role = heat_stack_owner
+stack_user_role = heat_stack_user
+username=admin
+project_name=admin
+password=ustack
+auth_url={{ keystone_public_url }}
+auth_version=3
+admin_user=admin
+admin_password=ustack
+admin_project_name=admin
+user_domain_name=Default
+project_domain_name=Default
+region=RegionOne
+endpoint_type=public
+instance_type=rally_heat
+minimal_instance_type=rally_heat_min
+image_ref="CentOS 7"
+minimal_image_ref="CentOS 7"
+floating_network_name = public
+fixed_network_name = heat-net
+fixed_subnet_name = heat-subnet
+{% if kolla_enable_tls_external|bool %}
+vm_to_heat_api_insecure = True
+{% endif %}
+
+[network]
+floating_network_name = public
+
+[validation]
+image_ssh_user = root
+floating_network_name = public
+ping_timeout = 600
+ssh_timeout = 900
+
+[load_balancer]
+amphora_ssh_user=ubuntu
+amphora_ssh_key=/var/log/kolla/rally/octavia_ssh_key
+test_with_ipv6=False
+enable_security_groups=True
+RBAC_test_type=owner_or_admin
+provider=amphorav2
+member_role = member
+enabled_provider_drivers = amphora:Amphora provider,amphorav2:AmphoraV2 provider
+build_timeout = 600
+check_timeout = 300
+lb_build_timeout = 900
+
+[share]
+enable_protocols = "cephfs"
+enable_ip_rules_for_protocols = ""
+enable_cert_rules_for_protocols = ""
+enable_user_rules_for_protocols = ""
+enable_cephx_rules_for_protocols = cephfs
+capability_storage_protocol = CEPHFS
+capability_snapshot_support = True
+capability_create_share_from_snapshot_support = False
+backend_names = "cephfs, cephnfs"
+image_with_share_tools = "CentOS 7"
+multitenancy_enabled = False
+image_username = root
+run_snapshot_tests = False
+run_share_group_tests = False
+run_replication_tests = False
+run_multiple_share_replicas_tests = False
+max_api_microversion = 2.63
+
+[scenario]
+dhcp_client = "dhclient"

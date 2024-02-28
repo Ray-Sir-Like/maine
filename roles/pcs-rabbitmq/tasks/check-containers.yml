@@ -1,0 +1,6 @@
+---
+- name: Enable rabbitmq bundle resource in pacemaker
+  command: >
+    docker exec hacluster_pacemaker pcs resource enable rabbitmq-bundle
+  run_once: True
+  when: enable_rabbitmq | bool

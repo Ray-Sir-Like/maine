@@ -1,0 +1,24 @@
+{
+    "command": "swallow-monitor --config-file /etc/swallow/swallow.conf",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/swallow.conf",
+            "dest": "/etc/swallow/swallow.conf",
+            "owner": "swallow",
+            "perm": "0600"
+        }{% if swallow_policy_file is defined %},
+        {
+            "source": "{{ container_config_directory }}/{{ swallow_policy_file }}",
+            "dest": "/etc/swallow/{{ swallow_policy_file }}",
+            "owner": "swallow",
+            "perm": "0600"
+        }{% endif %}
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/swallow",
+            "owner": "swallow:swallow",
+            "recurse": true
+        }
+    ]
+}

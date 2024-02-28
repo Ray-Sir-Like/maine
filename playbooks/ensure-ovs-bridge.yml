@@ -1,0 +1,54 @@
+---
+- name: OVS bridge setup
+  hosts: baremetal
+  gather_facts: no
+  tasks:
+    - name: Copy script ensure_openvswitch_configured.sh
+      copy:
+        content: |
+          #!/bin/bash
+
+          bridge=$1
+          port=$2
+
+          ip link show $port
+          if [[ $? -ne 0 ]]; then
+              # fail when device doesn't exist
+              exit 1
+          fi
+
+          ovs-vsctl br-exists $bridge
+          if [[ $? -eq 2 ]]; then
+              changed=changed
+              ovs-vsctl --no-wait add-br $bridge
+          fi
+
+          if [[ ! $(ovs-vsctl list-ports $bridge) =~ $(echo "\<$port\>") ]]; then
+              changed=changed
+              ovs-vsctl --no-wait add-port $bridge $port
+          fi
+
+          echo $changed
+        dest: /tmp/ensure_openvswitch_configured.sh
+        mode: "0755"
+      run_once: True
+      delegate_to: "localhost"
+
+    - name: Ensuring OVS bridge is properly setup
+      script: /tmp/ensure_openvswitch_configured.sh {{ item.0 }} {{ item.1 }}
+      register: status
+      changed_when: status.stdout.find('changed') != -1
+      when:
+        - inventory_hostname in groups["network"]
+          or (inventory_hostname in groups["compute"] and computes_need_external_bridge | bool )
+        - not enable_onos | bool
+      with_together:
+        - "{{ neutron_bridge_name.split(',') }}"
+        - "{{ neutron_external_interface.split(',') }}"
+
+    - name: Remove script ensure_openvswitch_configured.sh
+      file:
+        path: /tmp/ensure_openvswitch_configured.sh
+        state: absent
+      run_once: True
+      delegate_to: "localhost"

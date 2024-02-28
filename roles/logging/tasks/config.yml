@@ -1,0 +1,148 @@
+---
+- name: Ensuring config directories exist
+  file:
+    path: "{{ node_config_directory }}/{{ item.key }}"
+    state: "directory"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0770"
+  become: true
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ logging_services }}"
+
+- name: Copying over extra CA certificates
+  become: true
+  copy:
+    src: "{{ node_config }}/certificates/ca/"
+    dest: "{{ node_config_directory }}/{{ item.key }}/ca-certificates"
+    mode: "0644"
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+    - kolla_copy_ca_into_containers | bool
+  with_dict: "{{ logging_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Ensure fluentd image is present for label check
+  vars:
+    service_name: "logging-fluentd"
+    service: "{{ logging_services[service_name] }}"
+  become: true
+  kolla_docker:
+    action: "pull_image"
+    common_options: "{{ docker_common_options }}"
+    image: "{{ service.image }}"
+
+- name: Fetch fluentd image labels
+  vars:
+    service_name: "logging-fluentd"
+    service: "{{ logging_services[service_name] }}"
+  become: true
+  docker_image_info:
+    name: "{{ service.image }}"
+  register: fluentd_labels
+
+- name: Set fluentd facts
+  set_fact:
+    fluentd_binary: "{% if fluentd_labels.images.0.ContainerConfig.Labels.fluentd_binary is not defined %}td-agent{% else %}{{ fluentd_labels.images.0.ContainerConfig.Labels.fluentd_binary }}{% endif %}"
+
+- name: Copying over config.json files for services
+  template:
+    src: "{{ item.key }}.json.j2"
+    dest: "{{ node_config_directory }}/{{ item.key }}/config.json"
+    mode: "0660"
+  become: true
+  register: logging_config_jsons
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ logging_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- import_tasks: config_fluentd.yml
+
+- name: Copying over opensearch service config files
+  vars:
+    service_name: "logging-opensearch"
+    service: "{{ logging_services[service_name] }}"
+  merge_yaml:
+    sources:
+      - "{{ role_path }}/templates/opensearch.yml.j2"
+      - "{{ node_custom_config }}/opensearch.yml"
+      - "{{ node_custom_config }}/{{ service_name }}/opensearch.yml"
+      - "{{ node_custom_config }}/{{ service_name }}/{{ inventory_hostname }}/opensearch.yml"
+    dest: "{{ node_config_directory }}/{{ service_name }}/opensearch.yml"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service.group]
+    - service.enabled | bool
+  with_dict: "{{ service }}"
+  notify:
+    - Restart {{ service_name }} container
+
+- name: Copying over opensearch curator actions
+  vars:
+    service: "{{ logging_services['logging-opensearch-curator'] }}"
+  template:
+    src: "{{ item }}"
+    dest: "{{ node_config_directory }}/logging-opensearch-curator/opensearch-curator-actions.yml"
+    mode: "0660"
+  become: true
+  when:
+    - service.enabled | bool
+    - inventory_hostname in groups[service['group']]
+  with_first_found:
+    - "{{ node_custom_config }}/logging-opensearch/opensearch-curator-actions.yml"
+    - "{{ role_path }}/templates/opensearch-curator-actions.yml.j2"
+  notify:
+    - Restart logging-opensearch-curator container
+
+- name: Copying over opensearch curator crontab
+  vars:
+    service: "{{ logging_services['logging-opensearch-curator'] }}"
+  template:
+    src: "{{ role_path }}/templates/opensearch-curator.crontab.j2"
+    dest: "{{ node_config_directory }}/logging-opensearch-curator/opensearch-curator.crontab"
+    mode: "0660"
+  become: true
+  when:
+    - service.enabled | bool
+    - inventory_hostname in groups[service['group']]
+  notify:
+    - Restart logging-opensearch-curator container
+
+
+- name: Copying over opensearch-dashboards configuration file
+  vars:
+    service_name: "logging-opensearch-dashboards"
+    service: "{{ logging_services[service_name] }}"
+  template:
+    src: "opensearch_dashboards.yml.j2"
+    dest: "{{ node_config_directory }}/{{ service_name }}/opensearch_dashboards.yml"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service.group]
+    - service.enabled | bool
+  with_dict: "{{ service }}"
+  notify:
+    - Restart logging-opensearch-dashboards container
+
+- name: Copying over logging opensearch curator configuration file
+  vars:
+    service: "{{ logging_services['logging-opensearch-curator'] }}"
+  template:
+    src: "{{ role_path }}/templates/opensearch-curator.yml.j2"
+    dest: "{{ node_config_directory }}/logging-opensearch-curator/opensearch-curator.yml"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service['group']]
+    - service.enabled | bool
+  notify:
+    - Restart logging-opensearch-curator container

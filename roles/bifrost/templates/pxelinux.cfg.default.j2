@@ -1,0 +1,7 @@
+default introspect
+
+label introspect
+kernel ipa.kernel
+append initrd=/ipa.initramfs ipa-inspection-callback-url=http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:7050/v1/continue ipa-inspection-collectors=default ipa-collect-lldp=1 systemd.journald.forward_to_console=yes rootpwd="3pnaDNUv1Ex3g"
+
+ipappend 3

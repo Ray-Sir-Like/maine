@@ -1,0 +1,83 @@
+---
+- name: Ensure python ironicclient
+  package:
+    name: "{{ ironicclient }}"
+    state: present
+  tags:
+    - ironic
+  when:
+    - with_os_client | bool
+
+- name: Ensure python ironic inspector client
+  package:
+    name: "{{ ironic_inspectorclient }}"
+    state: present
+  tags:
+    - ironic
+  when:
+    - with_os_client | bool
+
+- name: Create basic ironic inspection rules
+  vars:
+    ironic_ipxe_endpoint: "{{ internal_protocol }}://{{ ironic_internal_fqdn | put_address_in_context('url') }}:{{ ironic_ipxe_port }}"
+    ipa_kernel_name: "ipa.kernel"
+    ipa_initramfs_name: "ipa.initramfs"
+    ipa_aarch64_kernel_name: "ipa-aarch64.kernel"
+    ipa_aarch64_initramfs_name: "ipa-aarch64.initramfs"
+  shell: |
+    {{ docker_cmd }} cat <<EOF >/tmp/discovery_rules.json
+    [{
+        "description": "Set deploy_kernel and ramdisk for x86_64 server",
+        "actions": [
+            {"action": "set-attribute", "path": "driver_info/deploy_kernel",
+             "value": "{{ ironic_ipxe_endpoint }}/{{ ipa_kernel_name }}"},
+            {"action": "set-attribute", "path": "driver_info/deploy_ramdisk",
+             "value": "{{ ironic_ipxe_endpoint }}/{{ ipa_initramfs_name }}"}
+        ],
+        "conditions": [
+            {"op": "is-empty", "field": "node://driver_info.deploy_ramdisk"},
+            {"op": "is-empty", "field": "node://driver_info.deploy_kernel"},
+            {"op": "eq", "field": "data://cpu_arch", "value": "x86_64"}
+        ],
+        "uuid": "9baed377-8e61-494f-9552-91148ad28ae2"
+    },{
+        "description": "Set deploy_kernel and ramdisk for aarch64 server",
+        "actions": [
+            {"action": "set-attribute", "path": "driver_info/deploy_kernel",
+             "value": "{{ ironic_ipxe_endpoint }}/{{ ipa_aarch64_kernel_name }}"},
+            {"action": "set-attribute", "path": "driver_info/deploy_ramdisk",
+             "value": "{{ ironic_ipxe_endpoint }}/{{ ipa_aarch64_initramfs_name }}"}
+        ],
+        "conditions": [
+            {"op": "is-empty", "field": "node://driver_info.deploy_ramdisk"},
+            {"op": "is-empty", "field": "node://driver_info.deploy_kernel"},
+            {"op": "eq", "field": "data://cpu_arch", "value": "aarch64"}
+        ],
+        "uuid": "81b93d51-d346-46e2-817e-4d22f2fd614d"
+    },{
+       "description": "Set boot mode to UEFI when UEFI is enabled",
+       "conditions": [
+           {"op": "eq", "field": "data://inventory.boot.current_boot_mode", "value": "uefi"}
+       ],
+       "actions": [
+            {"action": "set-capability", "name": "boot_mode", "value": "uefi"},
+            {"action": "set-capability", "name": "boot_option", "value": "local"}
+       ],
+       "uuid": "419f30e1-488d-46b4-90d1-830b60e8b7a2"
+    },{
+       "description": "Set boot mode to Legacy when UEFI is not enabled",
+       "conditions": [
+           {"op": "ne", "field": "data://inventory.boot.current_boot_mode", "value": "uefi"}
+       ],
+       "actions": [
+            {"action": "set-capability", "name": "boot_mode", "value": "bios"},
+            {"action": "set-capability", "name": "boot_option", "value": "local"}
+       ],
+       "uuid": "25676fef-b128-418d-9d6d-579760fb230d"
+    }]
+    EOF
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && openstack baremetal introspection rule import /tmp/discovery_rules.json"
+    {{ docker_cmd }} rm -f /tmp/discovery_rules.json
+  run_once: True
+  tags:
+    - ironic

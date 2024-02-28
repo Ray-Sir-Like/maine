@@ -1,0 +1,9 @@
+---
+- name: Ensure python senlinclient
+  package:
+    name: "{{ senlinclient }}"
+    state: present
+  tags:
+    - senlin
+  when:
+    - with_os_client | bool

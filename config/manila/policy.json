@@ -1,0 +1,3 @@
+{
+    "share:force_delete": "rule:admin_or_owner"
+}

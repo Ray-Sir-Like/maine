@@ -1,0 +1,84 @@
+---
+groups:
+- name: ceph_exporter_status_warning
+  rules:
+  - alert: ceph_exporter_is_unreachable
+    expr: sum(up{job="ceph_exporter"}) < 3
+    labels:
+      severity: warning
+    annotations:
+      description: " ceph 监控数据采集服务 {{ $labels.job }}异常"
+- name: ceph_dashboard
+  rules:
+  - alert: Ceph Health Warning
+    expr: ceph_health_status == 1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Ceph Health Warning"
+      description: "Ceph 集群监控状态为 Warning"
+  - alert: Ceph Slow Ops
+    expr: ceph_healthcheck_slow_ops > 0
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Ceph Health Warning"
+      description: "Ceph 集群出现 slow Ops"
+  - alert: Ceph Health Error
+    expr: ceph_health_status > 1
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Ceph Health Error"
+      description: "Ceph 集群监控状态为 Error"
+  - alert: Disk(s) Near Full
+    expr: (ceph_osd_stat_bytes_used / ceph_osd_stat_bytes) * 100 + on(ceph_daemon) group_left(exported_instance) 0*ceph_disk_occupation > 85
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Disk(s) Near Full"
+      description: '节点 {{ $labels.exported_instance }} 上的进程 {{ $labels.ceph_daemon }} 所纳管的磁盘容量大于 85%, 当前容量为 {{ $value | printf "%.1f" }}%'
+  - alert: OSD(s) Down
+    expr: (ceph_osd_up == 0 and ceph_osd_in == 1) + on(ceph_daemon)  group_left(exported_instance) 0*ceph_disk_occupation < 0.5
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "OSD(s) Down"
+      description: "节点 {{ $labels.exported_instance }} 上的 {{ $labels.ceph_daemon }} 已停止运行"
+  - alert: OSD Host(s) Down
+    expr: count by(exported_instance) (ceph_disk_occupation * on(ceph_daemon) group_left(instance) (ceph_osd_up == 0 and ceph_osd_in == 1)) - count by(exported_instance) (ceph_disk_occupation) == 0
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "OSD Host(s) Down"
+      description: "节点 {{ $labels.exported_instance }} 上所有 OSD 均停止运行"
+  - alert: Pool Capacity Low
+    expr: (ceph_pool_stored / (ceph_pool_stored + ceph_pool_max_avail) * 100 + on (pool_id) group_left (name) (ceph_pool_metadata*0)) > 85
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Pool Capacity Low"
+      description: '存储池 {{ $labels.name }} 空间不足，已用空间大于 85%，当前使用空间为 {{ $value | printf "%.1f" }}%'
+  - alert: MON(s) Down
+    expr: ceph_mon_quorum_status != 1
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "MON(s) down"
+      description: "Ceph Monitor {{ $labels.ceph_daemon }} 已停止运行"
+  - alert: OSD(s) with High PG Count
+    expr: ceph_osd_numpg > 300
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "OSD(s) with High PG Count"
+      description: "OSD {{ $labels.ceph_daemon }} 上的 PG 数量超过 300+."

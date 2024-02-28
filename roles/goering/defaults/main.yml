@@ -1,0 +1,141 @@
+---
+project_name: "goering"
+
+goering_services:
+  goering-api:
+    container_name: goering_api
+    group: goering-api
+    enabled: true
+    image: "{{ goering_api_image_full }}"
+    volumes: "{{ goering_api_default_volumes + goering_api_extra_volumes }}"
+    dimensions: "{{ goering_api_dimensions }}"
+    healthcheck: "{{ goering_api_healthcheck }}"
+    haproxy:
+      goering_api:
+        enabled: "{{ enable_goering }}"
+        mode: "http"
+        external: false
+        port: "{{ goering_api_port }}"
+      goering_api_external:
+        enabled: "{{ enable_goering }}"
+        mode: "http"
+        external: true
+        port: "{{ goering_api_port }}"
+  goering-processor:
+    container_name: goering_processor
+    group: goering-processor
+    enabled: true
+    image: "{{ goering_processor_image_full }}"
+    privileged: True
+    volumes: "{{ goering_processor_default_volumes + goering_processor_extra_volumes }}"
+    dimensions: "{{ goering_processor_dimensions }}"
+    healthcheck: "{{ goering_processor_healthcheck }}"
+
+####################
+## Database
+####################
+goering_database_name: "goering"
+goering_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}goering{% endif %}"
+goering_database_address: "{{ database_address }}:{{ database_port }}"
+
+
+####################
+## Docker
+####################
+goering_install_type: "{{ kolla_install_type }}"
+goering_tag: "{{ openstack_tag }}"
+
+goering_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/goering-api"
+goering_api_tag: "{{ goering_tag }}"
+goering_api_image_full: "{{ goering_api_image }}:{{ goering_api_tag }}"
+
+goering_processor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/goering-processor"
+goering_processor_tag: "{{ goering_tag }}"
+goering_processor_image_full: "{{ goering_processor_image }}:{{ goering_processor_tag }}"
+
+goering_api_dimensions: "{{ default_container_dimensions }}"
+goering_processor_dimensions: "{{ default_container_dimensions }}"
+
+goering_api_enable_healthchecks: "{{ enable_container_healthchecks }}"
+goering_api_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+goering_api_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+goering_api_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+goering_api_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ goering_api_port}} "]
+goering_api_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+goering_api_healthcheck:
+  interval: "{{ goering_api_healthcheck_interval }}"
+  retries: "{{ goering_api_healthcheck_retries }}"
+  start_period: "{{ goering_api_healthcheck_start_period }}"
+  test: "{% if goering_api_enable_healthchecks | bool %}{{ goering_api_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ goering_api_healthcheck_timeout }}"
+
+goering_processor_enable_healthchecks: "{{ enable_container_healthchecks }}"
+goering_processor_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+goering_processor_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+goering_processor_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+goering_processor_healthcheck_test: ["CMD-SHELL", "healthcheck_port goering-processor {{ om_rpc_port }}"]
+goering_processor_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+goering_processor_healthcheck:
+  interval: "{{ goering_processor_healthcheck_interval }}"
+  retries: "{{ goering_processor_healthcheck_retries }}"
+  start_period: "{{ goering_processor_healthcheck_start_period }}"
+  test: "{% if goering_processor_enable_healthchecks | bool %}{{ goering_processor_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ goering_processor_healthcheck_timeout }}"
+
+goering_api_default_volumes:
+  - "{{ node_config_directory }}/goering-api/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "{{ kolla_dev_repos_directory ~ '/goering/goering:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/goering' if goering_dev_mode | bool else '' }}"
+  - "kolla_logs:/var/log/kolla/"
+goering_processor_default_volumes:
+  - "{{ node_config_directory }}/goering-processor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/goering/goering:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/goering' if goering_dev_mode | bool else '' }}"
+  - "/run:/run:shared"
+  - "/usr/lib/docker:/usr/lib/docker"
+  - "/var/lib/docker:/var/lib/docker"
+
+goering_extra_volumes: "{{ default_extra_volumes }}"
+goering_api_extra_volumes: "{{ goering_extra_volumes }}"
+goering_processor_extra_volumes: "{{ goering_extra_volumes }}"
+
+####################
+## OpenStack
+####################
+goering_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ goering_api_port }}/v1/"
+goering_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ goering_api_port }}/v1/"
+goering_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ goering_api_port }}/v1/"
+
+goering_logging_debug: "{{ openstack_logging_debug }}"
+
+goering_keystone_user: "goering"
+
+openstack_goering_auth: "{{ openstack_auth }}"
+
+
+####################
+# Kolla
+####################
+goering_git_repository: "{{ kolla_dev_repos_git }}/{{ project_name }}"
+goering_dev_repos_pull: "{{ kolla_dev_repos_pull }}"
+goering_dev_mode: "{{ kolla_dev_mode }}"
+goering_source_version: "{{ kolla_source_version }}"
+
+####################
+# Keystone
+####################
+goering_ks_services:
+  - name: "goering"
+    type: "order"
+    description: "Order Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ goering_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ goering_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ goering_public_endpoint }}'}
+
+goering_ks_users:
+  - project: "service"
+    user: "{{ goering_keystone_user }}"
+    password: "{{ goering_keystone_password }}"
+    role: "admin"

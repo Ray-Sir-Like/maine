@@ -1,0 +1,35 @@
+---
+#####################
+# General
+#####################
+admin_openrc: "/root/admin-openrc"
+with_os_client: "no"
+docker_cmd: "docker exec maine_toolbox"
+
+###################
+# RGW
+###################
+# Note(Yao Ning): S3 always listen on external network
+s3_admin_endpoint: "{{ admin_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ s3_proxy_server_port }}"
+s3_internal_endpoint: "{{ internal_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ s3_proxy_server_port }}"
+s3_public_endpoint: "{{ public_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ s3_proxy_server_port }}"
+openstack_s3_auth: "{{ openstack_auth }}"
+
+swift_admin_endpoint: "{{ admin_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ swift_proxy_server_port }}/swift/v1/AUTH_%(tenant_id)s"
+swift_internal_endpoint: "{{ internal_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ swift_proxy_server_port }}/swift/v1/AUTH_%(tenant_id)s"
+swift_public_endpoint: "{{ public_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ swift_proxy_server_port }}/swift/v1/AUTH_%(tenant_id)s"
+openstack_swift_auth: "{{ openstack_auth }}"
+
+####################
+# Mistral
+####################
+workflow_list:
+  - instance_time_snapshot
+  - volume_time_snapshot
+  - volume_time_backup
+  - share_time_snapshot
+
+####################
+# Docs
+####################
+docs_release: "{{ openstack_tag }}"

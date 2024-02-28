@@ -1,0 +1,41 @@
+---
+- name: Get container facts
+  kolla_container_facts:
+    name:
+      - kunkka
+      - kunkka-admin
+      - kunkka-message
+  register: container_facts
+
+- name: Checking free port for Kunkka
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ kunkka_console_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['kunkka'] is not defined
+    - inventory_hostname in groups['kunkka']
+
+- name: Checking free port for Kunkka admin
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ kunkka_admin_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['kunkka-admin'] is not defined
+    - inventory_hostname in groups['kunkka-admin']
+
+- name: Checking free port for Kunkka message
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ kunkka_message_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['kunkka-message'] is not defined
+    - inventory_hostname in groups['kunkka-message']

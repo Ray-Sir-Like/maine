@@ -1,0 +1,5 @@
+{
+    "command": "/opt/node_exporter/node_exporter --path.rootfs /host --path.procfs /host/proc --path.sysfs /host/sys --collector.processes --collector.systemd --web.listen-address {{ monitoring_interface_address }}:{{ hawkeye_node_exporter_port }} --collector.systemd.unit-include {{ systemd_unit_include | join('|') }}",
+    "config_files": [],
+    "permissions": []
+}

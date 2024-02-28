@@ -1,0 +1,184 @@
+---
+project_name: "prometheus"
+
+deprecated_prometheus_services:
+  - pushgateway
+  - unitedstack-prometheus-proxy
+  - unitedstack_prometheus_proxy
+
+prometheus_services:
+  prometheus-server:
+    container_name: prometheus_server
+    group: prometheus-server
+    enabled: "{{ enable_prometheus | bool }}"
+    image: "{{ prometheus_server_image_full }}"
+    volumes: "{{ prometheus_server_default_volumes + prometheus_server_extra_volumes }}"
+    dimensions: "{{ prometheus_server_dimensions }}"
+    healthcheck: "{{ prometheus_server_healthcheck }}"
+    haproxy:
+      prometheus_server:
+        enabled: "{{ enable_prometheus | bool }}"
+        mode: "http"
+        external: false
+        port: "{{ prometheus_port }}"
+        custom_member_list: "{{ haproxy_members.split(';') }}"
+      prometheus_server_external:
+        enabled: "{{ enable_prometheus | bool }}"
+        mode: "http"
+        external: true
+        port: "{{ prometheus_port }}"
+        custom_member_list: "{{ haproxy_members.split(';') }}"
+        auth_user: "{{ prometheus_user }}"
+        auth_pass: "{{ prometheus_password }}"
+  prometheus-pushgateway:
+    container_name: prometheus_pushgateway
+    group: prometheus-pushgateway
+    enabled: "{{ enable_prometheus_pushgateway | bool }}"
+    image: "{{ prometheus_pushgateway_image_full }}"
+    volumes: "{{ prometheus_pushgateway_default_volumes + prometheus_pushgateway_extra_volumes }}"
+    dimensions: "{{ prometheus_pushgateway_dimensions }}"
+    haproxy:
+      pushgateway:
+        enabled: "{{ enable_prometheus_pushgateway | bool }}"
+        mode: "http"
+        external: false
+        port: "{{ prometheus_pushgateway_port }}"
+  prometheus-pushgateway-housekeeping:
+    container_name: prometheus_pushgateway_housekeeping
+    group: prometheus-pushgateway-housekeeping
+    enabled: "{{ enable_prometheus_pushgateway_housekeeping | bool }}"
+    image: "{{ prometheus_pushgateway_housekeeping_image_full }}"
+    volumes: "{{ prometheus_pushgateway_housekeeping_default_volumes + prometheus_pushgateway_housekeeping_extra_volumes }}"
+    dimensions: "{{ prometheus_pushgateway_housekeeping_dimensions }}"
+  prometheus-proxy:
+    container_name: prometheus_proxy
+    group: prometheus-proxy
+    enabled: "{{ enable_prometheus_proxy | bool }}"
+    image: "{{ prometheus_proxy_image_full }}"
+    volumes: "{{ prometheus_proxy_default_volumes + prometheus_proxy_extra_volumes }}"
+    dimensions: "{{ prometheus_proxy_dimensions }}"
+    healthcheck: "{{ prometheus_proxy_healthcheck }}"
+    haproxy:
+      prometheus_proxy:
+        enabled: "{{ enable_prometheus_proxy | bool }}"
+        mode: "http"
+        external: false
+        port: "{{ prometheus_proxy_port }}"
+      prometheus_proxy_external:
+        enabled: "{{ enable_prometheus_proxy | bool }}"
+        mode: "http"
+        external: true
+        port: "{{ prometheus_proxy_port }}"
+
+###################
+# HAProxy
+###################
+haproxy_members: "{% for host in groups['prometheus'] %} server {{ hostvars[host].ansible_facts.hostname }} {{ 'api' | kolla_address(host) }}:{{ prometheus_port }} check inter 2000 rise 2 fall 5{% if not loop.first %} backup{% endif %};{% endfor %}"
+
+####################
+# Docker
+####################
+prometheus_install_type: "{{ kolla_install_type }}"
+prometheus_tag: "{{ openstack_tag }}"
+
+prometheus_server_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-v2-server"
+prometheus_server_tag: "{{ prometheus_tag }}"
+prometheus_server_image_full: "{{ prometheus_server_image }}:{{ prometheus_server_tag }}"
+
+prometheus_pushgateway_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/pushgateway"
+prometheus_pushgateway_tag: "{{ prometheus_tag }}"
+prometheus_pushgateway_image_full: "{{ prometheus_pushgateway_image }}:{{ prometheus_pushgateway_tag }}"
+
+prometheus_pushgateway_housekeeping_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/pushgateway-housekeeping"
+prometheus_pushgateway_housekeeping_tag: "{{ prometheus_tag }}"
+prometheus_pushgateway_housekeeping_image_full: "{{ prometheus_pushgateway_housekeeping_image }}:{{ prometheus_pushgateway_housekeeping_tag }}"
+
+prometheus_proxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-proxy"
+prometheus_proxy_tag: "{{ prometheus_tag }}"
+prometheus_proxy_image_full: "{{ prometheus_proxy_image }}:{{ prometheus_proxy_tag }}"
+
+prometheus_server_dimensions: "{{ default_container_dimensions }}"
+prometheus_pushgateway_dimensions: "{{ default_container_dimensions }}"
+prometheus_pushgateway_housekeeping_dimensions: "{{ default_container_dimensions }}"
+prometheus_proxy_dimensions: "{{ default_container_dimensions }}"
+
+prometheus_server_enable_healthchecks: "{{ enable_container_healthchecks }}"
+prometheus_server_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+prometheus_server_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+prometheus_server_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+prometheus_server_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ prometheus_port }} "]
+prometheus_server_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+prometheus_server_healthcheck:
+  interval: "{{ prometheus_server_healthcheck_interval }}"
+  retries: "{{ prometheus_server_healthcheck_retries }}"
+  start_period: "{{ prometheus_server_healthcheck_start_period }}"
+  test: "{% if prometheus_server_enable_healthchecks | bool %}{{ prometheus_server_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ prometheus_server_healthcheck_timeout }}"
+
+prometheus_proxy_enable_healthchecks: "{{ enable_container_healthchecks }}"
+prometheus_proxy_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+prometheus_proxy_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+prometheus_proxy_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+prometheus_proxy_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ prometheus_proxy_port }}"]
+prometheus_proxy_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+prometheus_proxy_healthcheck:
+  interval: "{{ prometheus_proxy_healthcheck_interval }}"
+  retries: "{{ prometheus_proxy_healthcheck_retries }}"
+  start_period: "{{ prometheus_proxy_healthcheck_start_period }}"
+  test: "{% if prometheus_proxy_enable_healthchecks | bool %}{{ prometheus_proxy_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ prometheus_proxy_healthcheck_timeout }}"
+
+prometheus_server_default_volumes:
+  - "{{ node_config_directory }}/prometheus-server/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "prometheus:/var/lib/prometheus"
+  - "kolla_logs:/var/log/kolla/"
+prometheus_pushgateway_default_volumes:
+  - "{{ node_config_directory }}/prometheus-pushgateway/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+prometheus_pushgateway_housekeeping_default_volumes:
+  - "{{ node_config_directory }}/prometheus-pushgateway-housekeeping/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+prometheus_proxy_default_volumes:
+  - "{{ node_config_directory }}/prometheus-proxy/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+prometheus_extra_volumes: "{{ default_extra_volumes }}"
+prometheus_server_extra_volumes: "{{ prometheus_extra_volumes }}"
+prometheus_pushgateway_extra_volumes: "{{ prometheus_extra_volumes }}"
+prometheus_pushgateway_housekeeping_extra_volumes: "{{ prometheus_extra_volumes }}"
+prometheus_proxy_extra_volumes: "{{ prometheus_extra_volumes }}"
+
+####################
+# OpenStack
+####################
+prometheus_proxy_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ prometheus_proxy_port }}"
+prometheus_proxy_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ prometheus_proxy_port }}"
+prometheus_proxy_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ prometheus_proxy_port }}"
+
+prometheus_proxy_logging_debug: "{{ openstack_logging_debug }}"
+
+prometheus_keystone_user: "prometheus"
+
+openstack_prometheus_auth: "{{ openstack_auth }}"
+
+####################
+# Keystone
+####################
+prometheus_proxy_ks_services:
+  - name: "prometheus"
+    type: "metric"
+    description: "OpenStack Metric Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ prometheus_proxy_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ prometheus_proxy_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ prometheus_proxy_public_endpoint }}'}
+
+prometheus_proxy_ks_users:
+  - project: "service"
+    user: "{{ prometheus_keystone_user }}"
+    password: "{{ prometheus_keystone_password }}"
+    role: "admin"

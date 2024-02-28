@@ -1,0 +1,24 @@
+{
+    "command": "/bin/consul agent -config-dir=/consul/config",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/consul_agent.json",
+            "dest": "/consul/config/consul_agent.json",
+            "owner": "root",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/*exporter.json",
+            "dest": "/consul/config/",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/consul",
+            "owner": "root:root",
+            "recurse": true
+        }
+    ]
+}

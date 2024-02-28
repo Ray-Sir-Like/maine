@@ -1,0 +1,11 @@
+{
+    "command": "/opt/memcached_exporter/memcached_exporter --web.listen-address={{ monitoring_interface_address }}:{{ hawkeye_memcached_exporter_port }} --memcached.address={{ api_interface_address }}:{{ memcached_port }}",
+    "config_files": [],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/hawkeye",
+            "owner": "root:kolla",
+            "recurse": true
+        }
+    ]
+}

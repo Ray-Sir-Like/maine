@@ -1,0 +1,56 @@
+{% if designate_backend == 'pdns4' or designate_backend_external == 'pdns4' %}
+- name: default-pdns4
+  id: {{ designate_pool_id }}
+  description: Default PDNS4 Pool
+  attributes: {}
+  ns_records:
+{% if designate_backend == 'pdns4' %}
+    - hostname: {{ kolla_external_vip_address }}.
+      priority: 1
+{% elif designate_backend_external == 'pdns4' %}
+{% for host in designate_backend_external_pdns4_nameservers.replace(" ", "").split(',') %}
+    - hostname: {{ host }}.
+      priority: 1
+{% endfor %}
+{% endif %}
+  nameservers:
+{% if designate_backend == 'pdns4' %}
+    - host: {{ kolla_external_vip_address }}
+      port: {{ designate_bind_port }}
+{% elif designate_backend_external == 'pdns4' %}
+{% for host in designate_backend_external_pdns4_nameservers.replace(" ", "").split(',') %}
+    - host: {{ host }}
+      port: {{ designate_bind_port }}
+{% endfor %}
+{% endif %}
+  targets:
+{% if designate_backend == 'pdns4' %}
+    - type: pdns4
+      description: PDNS4 Server {{ kolla_internal_vip_address }}
+      masters:
+{% for mdns_host in groups['designate-mdns'] %}
+        - host: {{ 'dns' | kolla_address(mdns_host) }}
+          port: {{ designate_mdns_port }}
+{% endfor %}
+      options:
+        host: {{ kolla_external_vip_address }}
+        port: {{ designate_bind_port }}
+        api_endpoint: http://{{ kolla_internal_vip_address | put_address_in_context('url') }}:{{ pdns_webserver_port }}
+        api_token: {{ pdns_api_key }}
+{% elif designate_backend_external == 'pdns4' %}
+{% for bind_host in designate_backend_external_pdns4_nameservers.replace(" ", "").split(',') %}
+    - type: pdns4
+      description: PDNS4 Server {{ bind_host }}
+      masters:
+{% for mdns_host in groups['designate-mdns'] %}
+        - host: {{ 'dns' | kolla_address(mdns_host) }}
+          port: {{ designate_mdns_port }}
+{% endfor %}
+      options:
+        host: {{ bind_host }}
+        port: {{ designate_bind_port }}
+        api_endpoint: http://{{ bind_host | put_address_in_context('url') }}:{{ pdns_webserver_port }}
+        api_token: {{ pdns_api_key }}
+{% endfor %}
+{% endif %}
+{% endif %}

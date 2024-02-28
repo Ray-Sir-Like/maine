@@ -1,0 +1,14 @@
+{# NOTE(Xing Zhang): to keep groups shorter for operator #}
+{% if ('control' in groups) and (groups['control'] | length) %}
+{# hosts MUST NOT end with ',' and empty hosts will cause group 'all' fail #}
+ctl: {{ groups['control'] | join(',') }}
+{% endif%}
+{% if ('network' in groups) and (groups['control'] | length) %}
+net: {{ groups['network'] | join(',') }}
+{% endif%}
+{% if ('compute' in groups) and (groups['compute'] | length) %}
+comp: {{ groups['compute'] | join(',') }}
+{% endif%}
+
+{# empty will fail in this group #}
+all: {{ groups['baremetal'] | join(',') }}

@@ -1,0 +1,56 @@
+---
+project_name: "ryze"
+
+ryze_services:
+  ryze:
+    container_name: ryze
+    group: ryze
+    enabled: true
+    privileged: True
+    image: "{{ ryze_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/ryze/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ ryze_dimensions }}"
+    haproxy:
+      ryze:
+        enabled: "{{ enable_ryze }}"
+        mode: "http"
+        external: false
+        port: "{{ ryze_port }}"
+        listen_port: "{{ ryze_listen_port }}"
+        frontend_http_extra:
+          - "balance source"
+      ryze_external:
+        enabled: "{{ enable_ryze }}"
+        mode: "http"
+        external: true
+        port: "{% if kolla_enable_tls_external|bool and not enable_horizon|bool and not enable_kunkka|bool %}443{% else %}{{ ryze_port }}{% endif %}"
+        listen_port: "{{ ryze_listen_port }}"
+        frontend_http_extra:
+          - "balance source"
+      ryze_external_redirect:
+        enabled: "{{ enable_ryze|bool and kolla_enable_tls_external|bool and (ryze_port != ryze_listen_port)}}"
+        mode: "redirect"
+        external: true
+        port: "{{ ryze_port }}"
+        listen_port: "{{ ryze_listen_port }}"
+
+####################
+# Ryze
+####################
+ryze_log_dir: /var/log/kolla/ryze
+
+####################
+# Docker
+####################
+ryze_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ryze"
+ryze_tag: "{{ openstack_tag }}"
+ryze_image_full: "{{ ryze_image }}:{{ ryze_tag }}"
+ryze_dimensions: "{{ default_container_dimensions }}"
+
+####################
+# Firewall
+####################
+ryze_firewall_zone: "{{ firewall_zone }}"

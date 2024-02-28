@@ -1,0 +1,6 @@
+---
+- name: Set mariadb pcs resource force updated
+  set_fact:
+    mariadb_force_update: 'yes'
+
+- import_tasks: deploy.yml

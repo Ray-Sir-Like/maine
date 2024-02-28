@@ -1,0 +1,18 @@
+---
+- import_tasks: register.yml
+  when: inventory_hostname in groups['porsche-api']
+
+- import_tasks: config.yml
+  when: inventory_hostname in groups['porsche-api'] or
+        inventory_hostname in groups['porsche-processor']
+
+- import_tasks: check-containers.yml
+
+- import_tasks: clone.yml
+  when: porsche_dev_mode | bool
+
+- import_tasks: bootstrap.yml
+  when: inventory_hostname in groups['porsche-api']
+
+- name: Flush handlers
+  meta: flush_handlers

@@ -1,0 +1,10 @@
+{% if ipa_aarch64_kernel_name is defined and ipa_aarch64_initramfs_name is defined %}
+set default='Introspection for aarch64'
+set timeout=5
+set hidden_timeout_quiet=false
+
+menuentry 'Introspection for aarch64' {
+    linux /{{ ipa_aarch64_kernel_name }} text showopts selinux=0 ipa-inspection-callback-url=http://{{ 'bifrost_network' | kolla_address | put_address_in_context('url') }}:7050/v1/continue ipa-inspection-collectors=default ipa-collect-lldp=1 systemd.journald.forward_to_console=yes rootpwd="3pnaDNUv1Ex3g" BOOTIF=${net_default_mac}
+    initrd /{{ ipa_aarch64_initramfs_name }}
+}
+{% endif %}

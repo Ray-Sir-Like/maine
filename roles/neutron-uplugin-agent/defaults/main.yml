@@ -1,0 +1,44 @@
+---
+project_name: "uplugin"
+
+uplugin_services:
+  neutron-uplugin-agent:
+    container_name: "neutron_uplugin_agent"
+    group: "neutron-uplugin-agent"
+    enabled: "{{ enable_neutron_uplugin_agent | bool }}"
+    image: "{{ neutron_uplugin_agent_image_full }}"
+    privileged: True
+    host_in_groups: "{{ inventory_hostname in groups['neutron-uplugin-agent'] }}"
+    volumes:
+      - "{{ node_config_directory }}/neutron-uplugin-agent/:{{ container_config_directory }}/:ro"
+      - "/run:/run:shared"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ neutron_uplugin_agent_dimensions }}"
+    healthcheck: "{{ neutron_uplugin_agent_healthcheck }}"
+    environment:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+
+####################
+# Docker
+####################
+uplugin_install_type: "{{ kolla_install_type }}"
+
+neutron_uplugin_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/unitedstack-neutron-plugin"
+neutron_uplugin_agent_tag: "{{ openstack_tag }}"
+neutron_uplugin_agent_image_full: "{{ neutron_uplugin_agent_image }}:{{ neutron_uplugin_agent_tag }}"
+
+neutron_uplugin_agent_dimensions: "{{ default_container_dimensions }}"
+
+neutron_uplugin_agent_enable_healthchecks: "{{ enable_container_healthchecks }}"
+neutron_uplugin_agent_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+neutron_uplugin_agent_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+neutron_uplugin_agent_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+neutron_uplugin_agent_healthcheck_test: ["CMD-SHELL", "healthcheck_port neutron-uplugin-agent {{ om_rpc_port }}"]
+neutron_uplugin_agent_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+neutron_uplugin_agent_healthcheck:
+  interval: "{{ neutron_uplugin_agent_healthcheck_interval }}"
+  retries: "{{ neutron_uplugin_agent_healthcheck_retries }}"
+  start_period: "{{ neutron_uplugin_agent_healthcheck_start_period }}"
+  test: "{% if neutron_uplugin_agent_enable_healthchecks | bool %}{{ neutron_uplugin_agent_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ neutron_uplugin_agent_healthcheck_timeout }}"

@@ -1,0 +1,115 @@
+---
+# Due to the way we do our inventory, ansible does not pick up on the fact that
+# this role has already run. We can track what has run with host facts.
+deprecated_maine_common_services:
+  - maine_cron
+
+maine_common_services:
+  # DUMMY_ENVIRONMENT is needed because empty environment is not supported
+  cron:
+    container_name: cron
+    host_in_groups: "{{ inventory_hostname in groups['common'] }}"
+    enabled: True
+    image: "{{ cron_image_full }}"
+    environment:
+      DUMMY_ENVIRONMENT: kolla_useless_env
+    volumes: "{{ cron_default_volumes + cron_extra_volumes }}"
+    dimensions: "{{ cron_dimensions }}"
+  maine-toolbox:
+    container_name: maine_toolbox
+    group: maine-toolbox
+    enabled: True
+    image: "{{ maine_toolbox_image_full }}"
+    environment: {}
+    privileged: True
+    volumes: "{{ maine_toolbox_default_volumes + maine_toolbox_extra_volumes }}"
+    dimensions: "{{ maine_toolbox_dimensions }}"
+
+
+####################
+# Docker
+####################
+common_install_type: "{{ kolla_install_type }}"
+common_tag: "{{ openstack_tag }}"
+
+cron_dimensions: "{{ default_container_dimensions }}"
+maine_toolbox_dimensions: "{{ default_container_dimensions }}"
+
+cron_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cron"
+cron_tag: "{{ common_tag }}"
+cron_image_full: "{{ cron_image }}:{{ cron_tag }}"
+
+maine_toolbox_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/maine-toolbox"
+maine_toolbox_tag: "{{ common_tag }}"
+maine_toolbox_image_full: "{{ maine_toolbox_image }}:{{ maine_toolbox_tag }}"
+
+cron_default_volumes:
+  - "{{ node_config_directory }}/cron/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "/run/docker.sock:/run/docker.sock:shared"
+maine_toolbox_default_volumes:
+  - "{{ node_config_directory }}/maine-toolbox/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "/etc/kolla:/etc/kolla:ro"
+  - "{{ '/etc/timezone:/etc/timezone:ro' if ansible_facts.os_family == 'Debian' else '' }}"
+  - "/run/:/run/:shared"
+  - "kolla_logs:/var/log/kolla/"
+
+cron_extra_volumes: "{{ default_extra_volumes }}"
+maine_toolbox_extra_volumes: "{{ default_extra_volumes }}"
+
+# logrotate
+cron_logrotate_services:
+  - { name: "ansible", enabled: "yes" }
+  - { name: "aodh", enabled: "{{ enable_aodh | bool }}" }
+  - { name: "barbican", enabled: "{{ enable_barbican | bool }}" }
+  - { name: "ceilometer", enabled: "{{ enable_ceilometer | bool }}" }
+  - { name: "cinder", enabled: "{{ enable_cinder | bool }}" }
+  - { name: "cloudkitty", enabled: "{{ enable_cloudkitty | bool }}" }
+  - { name: "cyborg", enabled: "{{ enable_cyborg | bool }}" }
+  - { name: "designate", enabled: "{{ enable_designate | bool }}" }
+  - { name: "fluentd", enabled: "{{ enable_logging | bool }}" }
+  - { name: "furion", enabled: "{{ enable_furion | bool }}" }
+  - { name: "glance", enabled: "{{ enable_glance | bool }}" }
+  - { name: "grafana", enabled: "{{ enable_grafana | bool }}" }
+  - { name: "haproxy", enabled: "{{ enable_haproxy | bool }}" }
+  - { name: "hawkeye", enabled: "{{ enable_hawkeye | bool }}" }
+  - { name: "heat", enabled: "{{ enable_heat | bool }}" }
+  - { name: "horizon", enabled: "{{ enable_horizon | bool }}" }
+  - { name: "ironic", enabled: "{{ enable_ironic | bool }}" }
+  - { name: "ironic-inspector", enabled: "{{ enable_ironic | bool }}" }
+  - { name: "iscsid", enabled: "{{ enable_iscsid | bool }}" }
+  - { name: "juggernaut", enabled: "{{ enable_juggernaut | bool }}" }
+  - { name: "keepalived", enabled: "{{ enable_haproxy | bool }}" }
+  - { name: "keystone", enabled: "{{ enable_keystone | bool }}" }
+  - { name: "kunkka", enabled: "{{ enable_kunkka | bool }}" }
+  - { name: "kuryr", enabled: "{{ enable_kuryr | bool }}" }
+  - { name: "magnum", enabled: "{{ enable_magnum | bool }}" }
+  - { name: "manila", enabled: "{{ enable_manila | bool }}" }
+  - { name: "mariadb", enabled: "{{ enable_mariadb | bool }}" }
+  - { name: "masakari", enabled: "{{ enable_masakari | bool }}" }
+  - { name: "mistral", enabled: "{{ enable_mistral | bool }}" }
+  - { name: "murano", enabled: "{{ enable_murano | bool }}" }
+  - { name: "neutron", enabled: "{{ enable_neutron | bool }}" }
+  - { name: "nova", enabled: "{{ enable_nova | bool }}" }
+  - { name: "octavia", enabled: "{{ enable_octavia | bool }}" }
+  - { name: "opensearch", enabled: "{{ enable_logging | bool }}" }
+  - { name: "opensearch-dashboards", enabled: "{{ enable_logging | bool }}" }
+  - { name: "outward-rabbitmq", enabled: "{{ enable_outward_rabbitmq | bool }}" }
+  - { name: "panko", enabled: "{{ enable_panko | bool }}" }
+  - { name: "placement", enabled: "{{ enable_placement | bool }}" }
+  - { name: "porsche", enabled: "{{ enable_porsche | bool }}" }
+  - { name: "rabbitmq", enabled: "{{ enable_rabbitmq | bool }}" }
+  - { name: "rally", enabled: "{{ enable_rally | bool }}" }
+  - { name: "redis", enabled: "{{ enable_redis | bool }}" }
+  - { name: "sahara", enabled: "{{ enable_sahara | bool }}" }
+  - { name: "senlin", enabled: "{{ enable_senlin | bool }}" }
+  - { name: "shadowfiend", enabled: "{{ enable_shadowfiend | bool }}" }
+  - { name: "solum", enabled: "{{ enable_solum | bool }}" }
+  - { name: "tacker", enabled: "{{ enable_tacker | bool }}" }
+  - { name: "tempest", enabled: "{{ enable_tempest | bool }}" }
+  - { name: "trove", enabled: "{{ enable_trove | bool }}" }
+  - { name: "prometheus-proxy", enabled: "{{ enable_prometheus_proxy | bool }}" }
+  - { name: "watcher", enabled: "{{ enable_watcher | bool }}" }
+  - { name: "zaqar", enabled: "{{ enable_zaqar | bool }}" }

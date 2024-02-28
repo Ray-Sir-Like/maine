@@ -1,0 +1,154 @@
+---
+providers:
+{% if enable_nuntius_telegram | bool %}
+  telegram:
+    # @BotFather, then create a robot and get its token
+    token: "{{ nuntius_telegram_token }}"
+{% endif %}
+{% if enable_nuntius_dingtalk | bool %}
+  dingtalk:
+    # Robot access token
+    token: "{{ nuntius_dingtalk_token }}"
+    msgtype: "markdown"
+    title: "{{ nuntius_dingtalk_title }}"
+    # The phone number of the person you want @
+    atmobiles:
+{% for phone_number in nuntius_dingtalk_phone_numbers %}
+      - "{{ phone_number }}"
+{% endfor %}
+    isatall: {{ nuntius_dingtalk_isatall }}
+{% endif %}
+{% if enable_nuntius_hl95 | bool %}
+  hl95:
+    username: "{{ nuntius_hl95_username }}"
+    password: "{{ nuntius_hl95_password }}"
+    epid: "{{ nuntius_hl95_epid }}"
+    title: "{{ nuntius_hl95_title }}"
+{% endif %}
+{% if enable_nuntius_aliyun | bool %}
+  aliyun:
+    region_id: "{{ nuntius_aliyun_region_id }}"
+    access_key: "{{ nuntius_aliyun_access_key }}"
+    access_key_secret: "{{ nuntius_aliyun_access_key_secret}}"
+    sign_name: "{{ nuntius_aliyun_sign_name }}"
+    template_code: "{{ nuntius_aliyun_template_code }}"
+    template_param_key: "{{ nuntius_aliyun_template_param_key }}"
+{% endif %}
+{% if enable_nuntius_rsyslog | bool %}
+  rsyslog:
+    address: "{{ nuntius_rsyslog_address }}"
+    appname: "{{ nuntius_rsyslog_appname }}"
+    protocol: "{{ nuntius_rsyslog_protocol }}"
+{% endif %}
+{% if enable_nuntius_email | bool %}
+  email:
+    smtpserver: "{{ nuntius_email_smtpserver }}"
+    smtpuser: "{{ nuntius_email_smtpuser }}"
+    smtppwd: "{{ nuntius_email_smtppwd }}"
+    sender: "{{ nuntius_email_sender }}"
+    insecureskipverify: {{ nuntius_email_insecureskipverify }}
+{% endif %}
+{% if enable_nuntius_yunpian | bool %}
+  yunpian:
+    apikey: "{{ nuntius_yunpian_apikey }}"
+{% endif %}
+{% if enable_nuntius_activemq | bool %}
+  activemq:
+    url: "{{ nuntius_activemq_url }}"
+    queue: "{{ nuntius_activemq_queue }}"
+{% endif %}
+
+alert_field_mapping: {{ nuntius_alert_field_mapping | to_json }}
+
+templates:
+- /etc/nuntius/notifications.tmpl
+
+{% if nuntius_use_db | bool or nuntius_working_mode == 'db' %}
+db_address: "{{ nuntius_database_user }}:{{ nuntius_database_password }}@tcp({{ nuntius_database_address }})/{{ nuntius_database_name }}?parseTime=true"
+{% endif %}
+
+receivers:
+{% if enable_nuntius_telegram | bool %}
+  - name: 'telegram'
+    provider: telegram
+    alert_text: '{{ '{{' }} template "common_message" . {{ '}}' }}'
+    to:
+      # @userinfobot, then send a message @<YourUserName> to userinfobot to get the UserID
+      - '{{ nuntius_telegram_userid }}'
+{% endif %}
+
+{% if enable_nuntius_dingtalk | bool %}
+  - name: 'dingtalk'
+    provider: dingtalk
+    alert_text: '{{ '{{' }} template "dingtalk_markdown_message" . {{ '}}' }}'
+{% endif %}
+
+{% if enable_nuntius_hl95 | bool %}
+  - name: 'hl95'
+    provider: hl95
+    notify_text: '{{ '{{' }} template "notify_message" . {{ '}}' }}'
+    alert_text: '{{ '{{' }} template "common_message" . {{ '}}' }}'
+    to:
+{% for phone_number in nuntius_hl95_phone_numbers %}
+      - "{{ phone_number }}"
+{% endfor %}
+    from_db: {{ nuntius_use_db | bool }}
+{% endif %}
+
+{% if enable_nuntius_rsyslog | bool %}
+  - name: 'rsyslog'
+    provider: rsyslog
+    alert_text: '{{ '{{' }} template "rsyslog_message" . {{ '}}' }}'
+{% endif %}
+
+{% if enable_nuntius_email | bool %}
+  - name: 'email'
+    subject: '{{ nuntius_email_subject }}'
+    provider: email
+    notify_text: '{{ '{{' }} template "notify_message" . {{ '}}' }}'
+    alert_text: '{{ '{{' }} template "email_alert_message" . {{ '}}' }}'
+    to: []
+    from_db: {{ nuntius_use_db | bool }}
+{% endif %}
+
+{% if enable_nuntius_yunpian | bool %}
+  - name: 'yunpian'
+    provider: 'yunpian'
+    notify_text: '{{ '{{' }} template "notify_message" . {{ '}}' }}'
+    alert_text: '{{ '{{' }} template "common_message" . {{ '}}' }}'
+    to: []
+    from_db: {{ nuntius_use_db | bool }}
+{% endif %}
+
+{% if enable_nuntius_hl95 | bool or enable_nuntius_yunpian | bool %}
+  - name: 'sms'
+    provider: {{ 'hl95' if enable_nuntius_hl95 | bool else 'yunpian' }}
+
+    notify_text: '{{ '{{' }} template "notify_message" . {{ '}}' }}'
+    alert_text: '{{ '{{' }} template "common_message" . {{ '}}' }}'
+    from_db: {{ nuntius_use_db | bool }}
+
+  - name: sms_captcha
+    provider: {{ 'hl95' if enable_nuntius_hl95 | bool else 'yunpian' }}
+    notify_text: '{{ '{{' }} template "sms_captcha_message" {{ '}}' }}'
+
+  - name: sms_retrieve
+    provider: {{ 'hl95' if enable_nuntius_hl95 | bool else 'yunpian' }}
+    notify_text: '{{ '{{' }} template "sms_retrieve_message" {{ '}}' }}'
+
+  - name: sms_arrearage
+    provider: {{ 'hl95' if enable_nuntius_hl95 | bool else 'yunpian' }}
+    notify_text: '{{ '{{' }} template "sms_arrearage_message" {{ '}}' }}'
+
+  - name: sms_alert
+    provider: {{ 'hl95' if enable_nuntius_hl95 | bool else 'yunpian' }}
+    alert_text: '{{ '{{' }} template "sms_alert_message" {{ '}}' }}'
+{% endif %}
+
+{% if enable_nuntius_activemq | bool %}
+  - name: 'activemq'
+    provider: 'activemq'
+    from_db: {{ nuntius_use_db | bool }}
+{% endif %}
+
+working_mode: "{{ nuntius_working_mode }}"

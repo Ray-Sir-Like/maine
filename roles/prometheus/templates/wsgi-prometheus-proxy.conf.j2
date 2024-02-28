@@ -1,0 +1,24 @@
+Listen {{ api_interface_address }}:{{ prometheus_proxy_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<Directory "/usr/bin">
+    <FilesMatch "^unitedstack-prometheus-proxy$">
+      Options Indexes FollowSymLinks MultiViews
+      Require all granted
+    </FilesMatch>
+</Directory>
+
+<VirtualHost *:{{ prometheus_proxy_port }}>
+  ## Logging
+  ErrorLog "/var/log/kolla/prometheus/prometheus-proxy-error.log"
+  ServerSignature Off
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "/var/log/kolla/prometheus/prometheus-proxy-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess prometheus group=prometheus processes={{ openstack_service_workers }} threads=1 user=prometheus
+  WSGIProcessGroup prometheus
+  WSGIScriptAlias / "/usr/bin/unitedstack-prometheus-proxy"
+</VirtualHost>

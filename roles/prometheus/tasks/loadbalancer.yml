@@ -1,0 +1,18 @@
+---
+# Deprecated old haproxy config files
+- name: Ensure deprecated haproxy config files absent
+  become: true
+  file:
+    path: "{{ node_config_directory }}/haproxy/services.d/{{ item }}.cfg"
+    state: absent
+  loop: "{{ deprecated_prometheus_services }}"
+  tags: always
+  when:
+    - inventory_hostname in groups['haproxy']
+
+- name: "Configure haproxy for {{ project_name }}"
+  import_role:
+    role: haproxy-config
+  vars:
+    project_services: "{{ prometheus_services }}"
+  tags: always

@@ -1,0 +1,6 @@
+---
+- name: Set rabbitmq pcs resource force updated
+  set_fact:
+    rabbitmq_force_update: 'yes'
+
+- import_tasks: deploy.yml

@@ -1,0 +1,44 @@
+{% if ansible_distribution == 'CentOS' %}
+
+[AppStream]
+name=CentOS-8-Stream AppStream
+baseurl={{ repo_baseurl }}/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/os/{{ ansible_architecture }}/AppStream/
+gpgcheck=0
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+
+[baseos]
+name=CentOS Linux CentOS-8-Stream BaseOS
+baseurl={{ repo_baseurl }}/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/os/{{ ansible_architecture }}/BaseOS/
+gpgcheck=0
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+{% endif %}
+
+{% if ansible_distribution == 'openEuler' %}
+
+[OS]
+name=OS
+baseurl={{ repo_baseurl }}/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/os/{{ ansible_architecture }}/
+enabled=1
+gpgcheck=0
+gpgkey=http://repo.openeuler.org/openEuler-22.03-LTS-SP1/OS/$basearch/RPM-GPG-KEY-openEuler
+{% endif %}
+
+{% if uos_repo.stat.exists | bool %}
+
+[uos7]
+name=UnitedStack OpenStack Repository
+baseurl={{ repo_baseurl }}/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/uos7/{{ ansible_architecture }}
+enabled=1
+gpgcheck=0
+{% endif %}
+
+{% if uds_repo.stat.exists | bool %}
+
+[uds3]
+name=UnitedStack Software-Defined Storage Repository
+baseurl={{ repo_baseurl }}/{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}/uds3/{{ ansible_architecture }}
+enabled=1
+gpgcheck=0
+{% endif %}

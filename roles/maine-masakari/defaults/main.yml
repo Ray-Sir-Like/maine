@@ -1,0 +1,100 @@
+---
+project_name: "masakari"
+
+masakari_services:
+  masakari-hostmonitor:
+    container_name: masakari_hostmonitor
+    group: masakari-hostmonitor
+    enabled: True
+    ipc_mode: host
+    image: "{{ masakari_hostmonitor_image_full }}"
+    volumes: "{{ masakari_hostmonitor_default_volumes + masakari_hostmonitor_extra_volumes }}"
+    dimensions: "{{ masakari_hostmonitor_dimensions }}"
+  masakari-introspectiveinstancemonitor:
+    container_name: masakari_introspectiveinstancemonitor
+    group: masakari-introspectiveinstancemonitor
+    enabled: True
+    image: "{{ masakari_introspectiveinstancemonitor_image_full }}"
+    volumes: "{{ masakari_introspectiveinstancemonitor_default_volumes + masakari_introspectiveinstancemonitor_extra_volumes }}"
+    privileged: true
+    dimensions: "{{ masakari_introspectiveinstancemonitor_dimensions }}"
+    healthcheck: "{{ masakari_introspectiveinstancemonitor_healthcheck }}"
+
+
+####################
+# Docker
+####################
+masakari_tag: "{{ openstack_tag }}"
+
+masakari_hostmonitor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/masakari-hostmonitor"
+masakari_hostmonitor_tag: "{{ masakari_tag }}"
+masakari_hostmonitor_image_full: "{{ masakari_hostmonitor_image }}:{{ masakari_hostmonitor_tag }}"
+
+masakari_introspectiveinstancemonitor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/masakari-monitors"
+masakari_introspectiveinstancemonitor_tag: "{{ masakari_tag }}"
+masakari_introspectiveinstancemonitor_image_full: "{{ masakari_monitors_image }}:{{ masakari_introspectiveinstancemonitor_tag }}"
+
+masakari_hostmonitor_dimensions: "{{ default_container_dimensions }}"
+masakari_introspectiveinstancemonitor_dimensions: "{{ masakari_monitors_dimensions | default(default_container_dimensions) }}"
+
+masakari_introspectiveinstancemonitor_enable_healthchecks: "{{ enable_container_healthchecks }}"
+masakari_introspectiveinstancemonitor_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+masakari_introspectiveinstancemonitor_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+masakari_introspectiveinstancemonitor_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+masakari_introspectiveinstancemonitor_healthcheck_test: ["CMD-SHELL", "healthcheck_filemod /var/log/kolla/masakari/masakari-introspectiveinstancemonitor.log 600"]
+masakari_introspectiveinstancemonitor_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+masakari_introspectiveinstancemonitor_healthcheck:
+  interval: "{{ masakari_introspectiveinstancemonitor_healthcheck_interval }}"
+  retries: "{{ masakari_introspectiveinstancemonitor_healthcheck_retries }}"
+  start_period: "{{ masakari_introspectiveinstancemonitor_healthcheck_start_period }}"
+  test: "{% if masakari_introspectiveinstancemonitor_enable_healthchecks | bool %}{{ masakari_introspectiveinstancemonitor_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ masakari_introspectiveinstancemonitor_healthcheck_timeout }}"
+
+masakari_hostmonitor_extra_volumes: "{{ default_extra_volumes }}"
+masakari_introspectiveinstancemonitor_extra_volumes: "{{ default_extra_volumes }}"
+
+masakari_hostmonitor_default_volumes:
+  - "{{ node_config_directory }}/masakari-hostmonitor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "{{ '/etc/timezone:/etc/timezone:ro' if kolla_base_distro in ['debian', 'ubuntu'] else '' }}"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/masakari-monitors/masakarimonitors:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/masakarimonitors' if masakari_dev_mode | bool else '' }}"
+masakari_introspectiveinstancemonitor_default_volumes:
+  - "{{ node_config_directory }}/masakari-introspectiveinstancemonitor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "/var/run:/var/run:ro"
+  - "{{ kolla_dev_repos_directory ~ '/masakari/masakari:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/masakari' if masakari_dev_mode | bool else '' }}"
+
+####################
+# OpenStack
+####################
+masakari_keystone_user: "masakari"
+
+masakari_logging_debug: "{{ openstack_logging_debug }}"
+
+masakari_monitors_monitoring_interval: "30"
+
+####################
+# Kolla
+####################
+masakari_git_repository: "{{ kolla_dev_repos_git }}/{{ project_name }}"
+masakari_dev_repos_pull: "{{ kolla_dev_repos_pull }}"
+masakari_dev_mode: "{{ kolla_dev_mode }}"
+masakari_source_version: "{{ kolla_source_version }}"
+
+masakari_monitors_git_repository: "{{ kolla_dev_repos_git }}/masakarimonitors"
+masakari_monitors_dev_repos_pull: "{{ kolla_dev_repos_pull }}"
+masakari_monitors_dev_mode: "{{ kolla_dev_mode }}"
+masakari_monitors_source_version: "{{ kolla_source_version }}"
+
+####################
+# libvirt
+####################
+# Whether to enable libvirt SASL authentication.
+libvirt_enable_sasl: true
+# Username for libvirt SASL.
+libvirt_sasl_authname: "nova"
+# List of enabled libvirt SASL authentication mechanisms.
+libvirt_sasl_mech_list:
+  - "{{ 'SCRAM-SHA-256' if libvirt_tls | bool else 'DIGEST-MD5' }}"

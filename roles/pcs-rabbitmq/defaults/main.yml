@@ -1,0 +1,8 @@
+---
+rabbitmq_force_update: 'no'
+
+rabbitmq_nodes_count: "{{ groups['rabbitmq'] | length }}"
+rabbitmq_start_timeout: 200
+rabbitmq_stop_timeout: 200
+
+rabbitmq_tag: "{{ openstack_tag }}"

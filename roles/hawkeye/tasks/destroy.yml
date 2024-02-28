@@ -1,0 +1,18 @@
+---
+- name: Clean containers
+  docker_container:
+    name: "{{ item.key }}"
+    state: absent
+  with_dict: "{{ hawkeye_services }}"
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+
+- name: Clean volumes
+  docker_volume:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - consul
+    - hawkeye_prometheus
+    - hawkeye_alertmanager

@@ -1,0 +1,61 @@
+---
+project_name: "furion"
+
+furion_services:
+  furion-agent:
+    group: furion-agent
+    enabled: true
+  furion-server:
+    group: furion-server
+    enabled: true
+    haproxy:
+      furion_server:
+        enabled: "{{ enable_furion }}"
+        mode: "http"
+        external: false
+        port: "{{ furion_server_port }}"
+        listen_port: "{{ furion_server_port }}"
+      furion_server_external:
+        enabled: "{{ enable_furion }}"
+        mode: "http"
+        external: true
+        port: "{{ furion_server_port }}"
+        listen_port: "{{ furion_server_port }}"
+
+####################
+# Database
+####################
+furion_database_name: "furion"
+furion_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}furion{% endif %}"
+furion_database_address: "{{ database_address | put_address_in_context('url') }}:{{ database_port }}"
+
+####################
+# OpenStack
+####################
+furion_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn }}:{{ furion_server_port }}"
+furion_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn }}:{{ furion_server_port }}"
+
+openstack_furion_auth: "{{ openstack_auth }}"
+
+furion_keystone_user: "furion"
+
+furion_logging_debug: "{{ openstack_logging_debug }}"
+
+furion_agent_labels: "service,database,mq,redis,ironic,masakari,nova,neutron,octavia,vpn,cinder,manila,host,host_disk,bond,network_card,ceph,setting,nova_nfs"
+
+####################
+# Keystone
+####################
+furion_ks_services:
+  - name: "furion"
+    type: "inspection"
+    description: "UnitedStack Inspection Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ furion_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ furion_internal_endpoint }}'}
+
+furion_ks_users:
+  - project: "service"
+    user: "{{ furion_keystone_user }}"
+    password: "{{ furion_keystone_password }}"
+    role: "admin"

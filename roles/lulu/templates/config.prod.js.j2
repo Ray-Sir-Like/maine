@@ -1,0 +1,38 @@
+module.exports = () => ({
+  cluster: {
+    listen: {
+      hostname: '{{ api_interface_address }}',
+      port: {{ lulu_listen_port }}
+    },
+  },
+
+  redis: {
+    client: {
+      sentinels: [
+{% for host in groups['redis'] %}
+        {
+          host: '{{ 'api' | kolla_address(host) }}',
+          port: {{ redis_sentinel_port }}
+        },
+{%  endfor %}
+      ],
+      name: 'kolla',
+      password: '{{ redis_master_password }}',
+      db: {{ lulu_redis_db_number }},
+    },
+  },
+
+  logger: {
+    dir: '{{ lulu_log_dir }}'
+  },
+
+  keystone: {
+    endpointType: '{{ lulu_keystone_endpoint_type }}',
+    url: '{{ lulu_keystone_url }}',
+    userDomainName: '{{ default_user_domain_name }}',
+    username: '{{ lulu_keystone_user }}',
+    password: '{{ lulu_keystone_password }}',
+    projectDomainName: '{{ default_project_domain_name }}',
+    projectName: 'service',
+  },
+});

@@ -1,0 +1,15 @@
+---
+apiVersion: 1
+
+datasources:
+- name: 'prometheus'
+  type: prometheus
+  access: proxy
+  url: {{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ hawkeye_prometheus_port }}
+{% if kolla_enable_tls_internal|bool %}
+  jsonData:
+    tlsSkipVerify: true
+{% endif %}
+  isDefault: true
+  version: 1
+  editable: false

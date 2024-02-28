@@ -1,0 +1,23 @@
+---
+- name: Backup config files to controls
+  hosts:
+    - control
+  # use yes for ansible_date_time.date
+  gather_facts: yes
+  become: true
+  tags: basic
+  tasks:
+    - name: Ensure backup directory exists
+      file:
+        path: "{{ item }}"
+        state: directory
+        recurse: yes
+      loop:
+        - "/opt/maine_backup/{{ ansible_date_time.date }}"
+    - name: Backup /etc/maine and /etc/kolla to /opt/maine_backup/{{ ansible_date_time.date }}
+      copy:
+        src: "{{ item }}"
+        dest: "/opt/maine_backup/{{ ansible_date_time.date }}"
+      loop:
+        - "/etc/maine"
+        - "/etc/kolla"

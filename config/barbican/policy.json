@@ -1,0 +1,5 @@
+{
+  "kms_3party_integration_admin": "role:kms_3party_integration_admin",
+  "secret:decrypt": "rule:secret_decrypt_non_private_read or rule:secret_project_creator or rule:secret_project_admin or rule:secret_acl_read or rule:kms_3party_integration_admin",
+  "secret:get": "rule:secret_non_private_read or rule:secret_project_creator or rule:secret_project_admin or rule:secret_acl_read or rule:kms_3party_integration_admin"
+}

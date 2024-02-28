@@ -1,0 +1,24 @@
+---
+- name: Create pdns database Tables
+  vars:
+    pdns: "{{ pdns_services['pdns'] }}"
+  become: true
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    detach: False
+    environment:
+      KOLLA_BOOTSTRAP:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+      DATABASE_PASSWORD: "{{ database_password }}"
+      DATABASE_ADDR: "{{ kolla_internal_fqdn }}"
+      DATABASE_PORT: "{{ mariadb_port }}"
+      PDNS_DATABASE_NAME: "{{ pdns_database_name }}"
+    image: "{{ pdns.image }}"
+    labels:
+      BOOTSTRAP:
+    name: "bootstrap_pdns4"
+    restart_policy: "no"
+    volumes: "{{ pdns.volumes|reject('equalto', '')|list }}"
+  run_once: True
+  delegate_to: "{{ groups[pdns.group][0] }}"

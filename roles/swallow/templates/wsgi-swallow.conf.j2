@@ -1,0 +1,23 @@
+Listen {{ api_interface_address }}:{{ swallow_api_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<VirtualHost *:{{ swallow_api_port }}>
+
+  ErrorLog "/var/log/kolla/swallow/swallow-api-error.log"
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "/var/log/kolla/swallow/swallow-api-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess swallow group=swallow processes={{ openstack_service_workers }} threads=1 user=swallow
+  WSGIProcessGroup swallow
+  WSGIScriptAlias / "/usr/bin/swallow-api"
+
+  <Directory "/usr/bin">
+       <FilesMatch "^swallow-api$">
+            Require all granted
+       </FilesMatch>
+  </Directory>
+
+</VirtualHost>

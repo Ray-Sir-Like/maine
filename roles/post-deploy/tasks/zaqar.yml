@@ -1,0 +1,9 @@
+---
+- name: Ensure python zaqarclient
+  package:
+    name: "{{ zaqarclient }}"
+    state: present
+  tags:
+    - zaqar
+  when:
+    - with_os_client | bool

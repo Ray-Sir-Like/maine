@@ -1,0 +1,19 @@
+[pci]
+alias = {% for host in groups['compute'] -%}
+  {%- if not loop.first and hostvars[host]['gpu_ids'] is defined and hostvars[host]['gpu_ids']|length > 0 %},{%- endif -%}
+  {%- if hostvars[host]['gpu_ids'] is defined and hostvars[host]['gpu_ids']|length > 0 -%}
+  {%- for id in hostvars[host]['gpu_ids'] -%}
+  {"vendor_id":"{{ id.split(':')[0] }}","product_id":"{{ id.split(':')[1] }}","device_type":"type-PCI","name":"pgpu"}
+  {%- if not loop.last %},{% endif -%}
+  {%- endfor -%}
+  {%- endif %}
+  {%- endfor %}
+passthrough_whitelist = [{% for host in groups['compute'] -%}
+  {%- if not loop.first and hostvars[host]['gpu_ids'] is defined and hostvars[host]['gpu_ids']|length > 0 %},{% endif -%}
+  {%- if hostvars[host]['gpu_ids'] is defined and hostvars[host]['gpu_ids']|length > 0 -%}
+  {%- for id in hostvars[host]['gpu_ids'] -%}
+  {"vendor_id":"{{ id.split(':')[0] }}","product_id":"{{ id.split(':')[1] }}"}
+  {%- if not loop.last %},{% endif -%}
+  {%- endfor -%}
+  {%- endif %}
+  {%- endfor -%}]

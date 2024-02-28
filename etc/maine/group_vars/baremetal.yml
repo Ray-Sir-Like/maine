@@ -1,0 +1,58 @@
+---
+####################
+# Networking options
+####################
+network_config:
+  - type: interface
+    mtu: "{{ pxe_mtu }}"
+    name: eth1
+    addresses:
+      - ip_netmask: "{{ pxe_address }}/24"
+  - type: ovs_bridge
+    name: br-ex
+    mtu: "{{ service_mtu }}"
+    members:
+      - type: linux_bond
+        name: "{{ bond_name }}"
+        bonding_options: "mode=4 miimon=100 xmit_hash_policy=layer3+4"
+        mtu: "{{ service_mtu }}"
+        members:
+          - type: interface
+            name: eno1
+            mtu: "{{ service_mtu }}"
+          - type: interface
+            name: eno2
+            mtu: "{{ service_mtu }}"
+      - type: vlan
+        vlan_id: 2007
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2007 }}/24"
+  - type: interface
+    name: "{{ bond_name ~ '.2001' }}"
+    mtu: "{{ service_mtu }}"
+    addresses:
+      - ip_netmask: "{{ vlan2001 }}/24"
+  - type: interface
+    name: "{{ bond_name ~ '.2002' }}"
+    mtu: "{{ service_mtu }}"
+    addresses:
+      - ip_netmask: "{{ vlan2002 }}/24"
+  - type: interface
+    name: "{{ bond_name ~ '.2003' }}"
+    mtu: "{{ service_mtu }}"
+    addresses:
+      - ip_netmask: "{{ vlan2003 }}/24"
+  - type: interface
+    name: "{{ bond_name ~ '.2004' }}"
+    mtu: "{{ service_mtu }}"
+    addresses:
+      - ip_netmask: "{{ vlan2004 }}/24"
+    routes:
+      - next_hop: "{{ gateway }}"
+        default: true
+  - type: interface
+    name: "{{ bond_name ~ '.2005' }}"
+    mtu: "{{ service_mtu }}"
+    addresses:
+      - ip_netmask: "{{ vlan2005 }}/24"

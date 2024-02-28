@@ -1,0 +1,27 @@
+---
+- name: Bifrost configuration sanity check
+  gather_facts: false
+  hosts: bifrost
+  tasks:
+    - name: Bifrost check for bifrost network interface
+      fail:
+        msg: "seed_interface must be manually
+          configured in `/etc/maine/globals.yml`"
+      when:
+        - seed_interface is not defined
+
+    - name: Check openstack_release
+      fail:
+        msg: "openstack_release,
+          openstack_aggressive_release must
+          be manually configured in
+          /etc/maine/globals.yml"
+      when: >
+        openstack_release is none or
+        openstack_aggressive_release is none
+
+- name: Apply role bifrost
+  hosts: bifrost
+  roles:
+    - { role: bifrost,
+        tags: bifrost}

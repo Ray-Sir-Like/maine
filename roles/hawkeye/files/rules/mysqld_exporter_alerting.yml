@@ -1,0 +1,22 @@
+---
+groups:
+- name: GaleraAlerts
+  rules:
+  - alert: MySQLGaleraNotReady
+    expr: mysql_global_status_wsrep_ready != 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      description: '{{$labels.job}} on {{$labels.instance}} is not ready.'
+      summary: Galera cluster node not ready
+  - alert: MySQLGaleraOutOfSync
+    expr: (mysql_global_status_wsrep_local_state != 4 and mysql_global_variables_wsrep_desync
+      == 0)
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      description: '{{$labels.job}} on {{$labels.instance}} is not in sync ({{$value}}
+        != 4).'
+      summary: Galera cluster node out of sync

@@ -1,0 +1,21 @@
+---
+groups:
+- name: ConsulAlerts
+  rules:
+    - alert: ServiceHealthcheckFailed
+      expr: consul_catalog_service_node_healthy == 0
+      for: 5m
+      labels:
+        severity: major
+      annotations:
+        summary: "服务状态异常 (instance {{ $labels.instance }})"
+        description: "节点 {{ $labels.node }} 的 {{ $labels.service_name }} 服务状态异常"
+
+    - alert: MissingConsulLeaderNode
+      expr: consul_raft_leader < 1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "丢失 consul leader 节点 (instance {{ $labels.instance }})"
+        description: "丢失 consul leader 节点"

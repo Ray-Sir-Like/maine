@@ -1,0 +1,63 @@
+---
+- name: Delete rabbitmq resource in pacemaker
+  command: >
+    docker exec hacluster_pacemaker pcs resource delete rabbitmq-bundle
+  register: rabbitmq_pcs_resource_delete
+  failed_when:
+    - rabbitmq_pcs_resource_delete.rc != 0
+    - '"does not exist" not in rabbitmq_pcs_resource_delete.stderr'
+  run_once: True
+  when:
+    - rabbitmq_force_update | bool
+
+- name: Check pacemaker rabbitmq resource existed
+  command: >
+    docker exec hacluster_pacemaker pcs resource config rabbitmq-bundle
+  register: rabbitmq_pcs_resource_existed
+  failed_when:
+    - rabbitmq_pcs_resource_existed.rc != 0
+    - '"unable to find resource" not in rabbitmq_pcs_resource_existed.stderr'
+    - '"No resource found" not in rabbitmq_pcs_resource_existed.stderr'
+  run_once: True
+
+- name: Ensure pacemaker config directory existed
+  file:
+    path: /etc/pacemaker
+    state: directory
+    mode: '0755'
+
+- name: Copy pacemaker authkey for rabbitmq
+  copy:
+    src: /etc/kolla/hacluster-pacemaker/authkey
+    dest: /etc/pacemaker/authkey
+    mode: '0644'
+    remote_src: true
+
+- name: Create pacemaker resources for rabbitmq
+  block:
+    - name: Create rabbitmq bundle resource in pacemaker
+      command: >
+        docker exec hacluster_pacemaker pcs resource bundle create rabbitmq-bundle container docker
+        image={{ rabbitmq_image }}:{{ rabbitmq_tag }}
+        replicas={{ rabbitmq_nodes_count }}
+        options="--user=root --log-driver=journald -e KOLLA_CONFIG_STRATEGY=COPY_ALWAYS -e LANG=en_US.UTF-8 -e LC_ALL=en_US.UTF-8"
+        run-command="/bin/bash /usr/local/bin/kolla_start"
+        network=host
+        storage-map id=rabbitmq-cfg-files source-dir=/etc/kolla/rabbitmq/ target-dir=/var/lib/kolla/config_files/ options=ro
+        storage-map id=rabbitmq-localtime source-dir=/etc/localtime target-dir=/etc/localtime options=ro
+        storage-map id=rabbitmq-data source-dir=rabbitmq target-dir=/var/lib/rabbitmq/ options=rw
+        storage-map id=rabbitmq-logs source-dir=kolla_logs target-dir=/var/log/kolla/ options=rw
+        storage-map id=rabbitmq-syslog source-dir=/dev/log target-dir=/dev/log options=rw
+        network control-port={{ rabbitmq_pcs_control_port }} --disabled
+      run_once: True
+
+    - name: Create rabbitmq resource in pacemaker
+      command: >
+        docker exec hacluster_pacemaker pcs resource create rabbitmq
+        ocf:heartbeat:rabbitmq-cluster
+        meta notify=true container-attribute-target=host
+        op start timeout={{ rabbitmq_start_timeout }}s stop timeout={{ rabbitmq_stop_timeout }}s
+        bundle rabbitmq-bundle --disabled
+      run_once: true
+  when:
+    - rabbitmq_pcs_resource_existed.rc != 0

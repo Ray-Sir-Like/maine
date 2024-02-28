@@ -1,0 +1,11 @@
+---
+- include_tasks: os_specific.yml
+
+- include_tasks: os_security.yml
+
+- include_tasks: os_performance.yml
+
+- include_tasks: os_docker.yml
+
+- include_tasks: openstack_specific.yml
+  when: not skip_openstack | default(false) | bool

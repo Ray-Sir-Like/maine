@@ -1,0 +1,249 @@
+#! /usr/bin/env python
+# -*- coding: UTF-8 -*-
+# flake8: noqa
+# Copyright (c) 2018 Ustack, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License.  You may obtain a copy
+# of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+from email.mime.text import MIMEText
+from email.parser import Parser
+import json
+import smtplib
+import sys
+
+from jinja2 import Template
+from keystoneauth1 import loading
+from keystoneauth1 import session as ks_session
+from oslo_config import cfg
+from oslo_log import log as logging
+import requests
+import retrying
+
+
+LOG = None
+
+{% raw %}
+mail_body = u"""
+<div style="font-family: 'Microsoft YaHei',Arial,Helvetica,sans-serif; position: relative; margin: 0 auto; width: 550px; font-size: 0; background-color: #fff; padding: 30px 50px; box-shadow: 0 8px 20px 0 rgba(0,0,0,0.08); border-radius: 6px;">
+  <div class="msg-title" style="display: block; color: #252F3D; font-size: 16px; letter-spacing: 1.07px">
+    <p >
+      尊敬的{{corp_name}}用户:
+    </p>
+  </div>
+  <div class="msg-body" style="display: block; color: #252F3D; font-size: 14px; letter-spacing: 1.4px; text-align: justify; line-height: 20px; text-indent: 2em;">
+    {% if message_body is mapping and message_body['alarm_sources'] == 'system' %}
+      <li>告警编号: {{ message_body['alarm_id'] }}</li>
+      <li>告警名称: {{ message_body['alarm_name'] }}</li>
+      <li>严重性: {{ message_body['severity'] }}</li>
+      <li>之前的: {{ message_body['previous'] }}</li>
+      <li>当前的: {{ message_body['current'] }}</li>
+      <li>原因: {{ message_body['reason'] }}</li>
+      <li>原因数据: {{ message_body['reason_data'] }}</li>
+    {% elif message_body is mapping and message_body['alarm_sources'] == 'user' %}
+      {% for key, value in message_body.items() %}
+        <li>{{ key }}: {{ value }}</li>
+      {% endfor %}
+    {% else %}
+      {{ message_body }}
+    {% endif %}
+  </div>
+  <div class="msg-footer">
+      <p style="margin: 14px auto; font-size: 14px; letter-spacing: 0.93px; text-align: center; height: 20px; color: #01AFC9;">{{corp_name}}—<a style="text-decoration: none; color: #01AFC9;" href=" >">{{home_link}} </a></p>
+  </div>
+</div>
+"""
+
+mail_confirm_link = u"""
+  <p>您好！</p>
+  <p>您的邮箱将用于接收由{corp_name}发送的系统通知，如确认，请点击以下按钮：</p>
+  <p><a href="{confirm_link}" target="_blank" style="display: block; margin: 0 auto; padding-top: 8px; background: #01AFC9; border-radius: 2px; width: 180px; height: 32px; text-align: center; text-indent: 0; text-decoration: none; color: #FFFFFF;">确认接收通知</a></p>
+  <p style="text-align: right">{corp_name}</p>
+"""
+
+{% endraw %}
+
+
+opts = [
+    cfg.StrOpt('hostname',
+               default='smtp.qq.com',
+               help='Smtp mail server address'),
+    cfg.IntOpt('port',
+               default=0,
+               help='Smtp mail server port'),
+    cfg.StrOpt('username',
+               default='it-monitor',
+               help='Smtp mail server username'),
+    cfg.StrOpt('password',
+               default='',
+               help='Smtp mail server password'),
+    cfg.BoolOpt('secure',
+               default=False,
+               help='Smtp mail server whether use ssl'),
+    cfg.StrOpt('sender',
+               default='',
+               help ='The mailbox address of sender')
+        ]
+# group smtp_server
+smtp_server = cfg.OptGroup(name='smtp_server',
+                  title='group smtp_server Options')
+
+cfg.CONF.register_group(smtp_server)
+cfg.CONF.register_opts(opts, group=smtp_server)
+logging.register_options(cfg.CONF)
+
+def get_mail_info():
+    CONF = cfg.CONF.smtp_server
+    port = 25
+    if CONF.port != 0:
+        port = CONF.port
+    else:
+        port = 465 if CONF.secure else 25
+
+    return {"hostname": CONF.hostname,
+            "port": port,
+            "username": CONF.username,
+            "password": CONF.password,
+            "secure": CONF.secure,
+            "from": CONF.sender}
+
+
+def prepare_log(config):
+    logging.setup(config, "zaqar")
+    global LOG
+    LOG = logging.getLogger("/usr/bin/ustack_sendmail")
+
+
+def prepare_conf():
+    cfg.CONF(project='zaqar')
+    loading.register_auth_conf_options(cfg.CONF, 'keystone_authtoken')
+
+
+def get_admin_session():
+    auth_plugin = \
+        loading.load_auth_from_conf_options(cfg.CONF, 'keystone_authtoken')
+    return ks_session.Session(auth=auth_plugin)
+
+
+def get_endpoint(session, service_type, interface='internal'):
+    return session.get_endpoint(service_type=service_type,
+                                interface=interface)
+
+
+@retrying.retry(stop_max_attempt_number=3)
+def get_corp_info(session):
+    return {"corp_name": u"{{ zaqar_email_corperation_name }}",
+            "logo_url": "{{ zaqar_email_logo_url }}",
+            "home_link": "{{ zaqar_email_home_link }}" }
+
+
+def mail_temp(subbody, **kwargs):
+    template = Template(mail_body)
+    mail_result = template.render(message_body=subbody, **kwargs)
+    return mail_result.encode(encoding='utf_8')
+
+
+def generate_msg(subbody, to, from_, subject, **kwargs):
+    payload = mail_temp(subbody, **kwargs)
+    msg = MIMEText(payload, 'html', 'utf-8')
+    msg['subject'] = subject
+    msg['from'] = from_
+    msg['to'] = to
+
+    return msg
+
+
+def generate_subbody(subbody, **kwargs):
+    return subbody.format(**kwargs)
+
+
+def get_confirm_link(str_):
+    return str_.split('below: ')[-1]
+
+
+def validate_json(json_data):
+    try:
+        json.loads(json_data)
+    except ValueError as err:
+        return False
+    return True
+
+
+def add_alarm_sources(body):
+    if isinstance(body, dict):
+        body['alarm_sources'] = 'system'
+        system_alarm_key_list = ['alarm_id', 'alarm_name', 'severity',
+                                 'previous', 'current', 'reason',
+                                 'reason_data']
+        for i in system_alarm_key_list:
+            if i not in body:
+                body['alarm_sources'] = 'user'
+                break
+    return body
+
+
+def prepare_msg(msg_str):
+    headers = Parser().parsestr(msg_str)
+    payload = headers.get_payload()
+    message_type = None
+    if validate_json(payload):
+        payload = json.loads(headers.get_payload())
+        message_type = payload['Message_Type']
+    template = None
+    if message_type == 'Notification':
+        template = add_alarm_sources(payload['body'])
+    else:
+        template = generate_subbody(mail_confirm_link,
+                                    confirm_link=get_confirm_link(payload),
+                                    corp_name=u"{{ zaqar_email_corperation_name }}")
+
+    session = get_admin_session()
+    corp_info = get_corp_info(session)
+    LOG.info(corp_info)
+
+    mail_info = get_mail_info()
+    msg = generate_msg(
+        template, headers['to'],
+        mail_info['from'], headers['subject'], logo_url=corp_info['logo_url'],
+        corp_name=corp_info['corp_name'], home_link=corp_info['home_link'])
+
+    return msg
+
+
+@retrying.retry(stop_max_attempt_number=3)
+def send_it(msg):
+    mail_info = get_mail_info()
+    if mail_info['secure']:
+        sender = smtplib.SMTP_SSL(mail_info['hostname'], mail_info['port'])
+    else :
+        sender = smtplib.SMTP(mail_info['hostname'], mail_info['port'])
+    sender.set_debuglevel(0)
+
+    sender.ehlo(mail_info['hostname'])
+    if mail_info['username'] and mail_info['password']:
+        sender.login(mail_info['username'], mail_info['password'])
+    else:
+        LOG.error('username or password is not right!')
+    sender.sendmail(msg['from'], msg['to'], msg.as_string())
+
+
+def send_email(msg_str):
+    prepare_conf()
+    prepare_log(cfg.CONF)
+    send_it(prepare_msg(msg_str))
+
+
+if __name__ == '__main__':
+    try:
+        send_email(''.join(sys.stdin.readlines()))
+    except smtplib.SMTPException:
+        LOG.exception(u"Error: Failed to connect to the SMTP service")

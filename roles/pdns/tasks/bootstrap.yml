@@ -1,0 +1,53 @@
+---
+- name: Creating pdns database
+  become: true
+  kolla_toolbox:
+    module_name: mysql_db
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ pdns_database_name }}"
+  run_once: True
+  delegate_to: "{{ groups['designate-backend-pdns4'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool
+
+- name: Creating pdns database user and setting permissions
+  become: true
+  kolla_toolbox:
+    module_name: mysql_user
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ pdns_database_user }}"
+      password: "{{ pdns_database_password }}"
+      host: "%"
+      priv: "{{ pdns_database_name }}.*:ALL"
+      append_privs: "yes"
+  run_once: True
+  delegate_to: "{{ groups['designate-backend-pdns4'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool
+
+- name: check pdns tables existed
+  become: true
+  kolla_toolbox:
+    module_name: mysql_query
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      login_db: "{{ pdns_database_name }}"
+      query: "SHOW TABLES;"
+  register: pdns_tables_existed
+  changed_when: false
+  run_once: True
+  delegate_to: "{{ groups['designate-backend-pdns4'][0] }}"
+
+- import_tasks: bootstrap_service.yml
+  when: pdns_tables_existed.rowcount.0 < 7

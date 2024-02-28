@@ -1,0 +1,75 @@
+{% raw %}
+{{ define "common_title" }}[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} @ {{ .CommonLabels.identifier }} {{ end }}
+
+{{ define "common_message" }}
+{{ if gt (len .Alerts.Firing) 0 }}
+Alerts Firing:
+{{ range .Alerts.Firing }}* {{ .Labels.instance }}: {{ .Annotations.description }}
+{{ end }}{{ end }}
+{{ if gt (len .Alerts.Resolved) 0 }}
+Alerts Resolved:
+{{ range .Alerts.Resolved }}* {{ .Labels.instance }}: {{ .Annotations.description }}
+{{ end }}{{ end }}{{ end }}
+
+{{ define "common_text" }}{{ template "common_title" .}}
+{{ template "common_message" . }}{{ end }}
+
+{{ define "dingtalk_markdown_title" }}[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} @ {{ .CommonLabels.identifier }} {{ end }}
+{% endraw %}
+
+{% raw %}
+{{ define "dingtalk_markdown_message" }}
+{{ if gt (len .Alerts.Firing) 0 }}
+{% endraw %}
+# 接收提醒:
+{% for phone_number in nuntius_dingtalk_phone_numbers %}
+@{{ phone_number }}
+{% endfor %}
+{% raw %}
+# Alerts Firing:
+{{ range .Alerts.Firing }}> - {{ .Labels.instance }}: {{ .Annotations.description }}
+{{ end }}{{ end }}
+{{ if gt (len .Alerts.Resolved) 0 }}
+# Alerts Resolved:
+{{ range .Alerts.Resolved }}> - {{ .Labels.instance }}: {{ .Annotations.description }}
+{{ end }}{{ end }}{{ end }}
+
+{{ define "dingtalk_markdown_text" }}{{ template "common_title" .}}
+{{ template "dingtalk_markdown_message" . }}{{ end }}
+{% endraw %}
+
+{% raw %}
+{{ define "rsyslog_message" -}}
+{{ if gt (len .Alerts.Firing) 0 -}}
+status="firing" {{ range .Alerts.Firing }}msg="{{ .Annotations.description }}" {{ range $key, $value := .Labels }}{{ $key }}="{{ $value }}" {{ end }}{{ end }}{{ end }}
+{{ if gt (len .Alerts.Resolved) 0 }}
+status="resolved" {{ range .Alerts.Resolved }}msg="{{ .Annotations.description }}" {{ range $key, $value := .Labels }}{{ $key }}="{{ $value }}" {{ end }}{{ end }}{{ end }}
+{{ end }}
+
+{{ define "notify_message" }}
+{{ .Message }}
+{{ end }}
+
+{{ define "sms_captcha_message" }}您好，验证码 {{ index .Message "code" }}，请在 5 分钟内按页面提示提交验证码，切勿将验证码泄露给他人。{{ end }}
+{{ define "sms_retrieve_message" }}您好，从 {{ index .Message "space_name" }} 档案库取回的任务已 {{ index .Message "status" }}，任务ID: {{ index .Message "task_id" }}。{{ end }}
+{{ define "sms_arrearage_message" }}您好，您的账户余额已不足 {{ index .Message "threshold" }} 元，为保证您的正常使用，请您及时充值。{{ end }}
+
+{{ define "sms_alert_message" }}集群告警{{ range .Alerts }}
+时间：{{ .StartsAt.Format "2006-01-02 15:04:05" }}
+等级：{{ .Labels.severity }}
+描述：{{ .Annotations.description }}
+节点：{{ .Labels.instance }}
+状态：{{ .Status }}
+
+{{ end }}{{ end }}
+
+{{ define "email_alert_message" }}集群告警<br>{{ range.Alerts }}
+时间:  {{ .StartsAt.Format "2006-01-02 15:04:05"  }}<br>
+等级:  {{ .Labels.severity }}<br>
+描述:  {{ .Annotations.description }}<br>
+节点:  {{ .Labels.instance }}<br>
+状态:  {{ .Status }}<br>
+<br>
+{{ end }}{{ end }}
+
+{% endraw %}

@@ -1,0 +1,9 @@
+---
+- name: Ensure python designateclient
+  package:
+    name: "{{ designateclient }}"
+    state: present
+  tags:
+    - designate
+  when:
+    - with_os_client | bool

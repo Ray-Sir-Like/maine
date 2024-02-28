@@ -1,0 +1,71 @@
+---
+- name: Creating hawkeye database user and setting permissions
+  become: true
+  kolla_toolbox:
+    module_name: mysql_user
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ mysqld_exporter_database_user }}"
+      password: "{{ mysqld_exporter_database_password }}"
+      host: "%"
+      priv: "*.*:PROCESS,REPLICATION CLIENT,SUPER,SELECT"
+      append_privs: "yes"
+  run_once: True
+  delegate_to: "{{ groups['mariadb'][0] }}"
+  when:
+    - enable_hawkeye_mysqld_exporter | bool
+    - not use_preconfigured_databases | bool
+
+- name: Drop and Recreate grafana database later
+  become: true
+  kolla_toolbox:
+    module_name: mysql_db
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ grafana_database_name }}"
+      state: absent
+  run_once: True
+  delegate_to: "{{ groups['hawkeye_grafana'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool
+    - grafana_purge_database | bool
+
+- name: Creating grafana database
+  become: true
+  kolla_toolbox:
+    module_name: mysql_db
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ grafana_database_name }}"
+  run_once: True
+  delegate_to: "{{ groups['hawkeye_grafana'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool
+
+- name: Creating grafana database user and setting permissions
+  become: true
+  kolla_toolbox:
+    module_name: mysql_user
+    module_args:
+      login_host: "{{ database_address }}"
+      login_port: "{{ database_port }}"
+      login_user: "{{ database_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ grafana_database_user }}"
+      password: "{{ grafana_database_password }}"
+      host: "%"
+      priv: "{{ grafana_database_name }}.*:ALL"
+      append_privs: "yes"
+  run_once: True
+  delegate_to: "{{ groups['hawkeye_grafana'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool

@@ -1,0 +1,29 @@
+---
+- name: Creating captain databases
+  kolla_toolbox:
+    module_name: mysql_db
+    module_args:
+      login_host: "127.0.0.1"
+      login_port: "3306"
+      login_user: "root"
+      login_password: ""
+      name: "captain"
+  register: database
+  run_once: True
+
+- name: Creating captain databases user and setting permissions
+  kolla_toolbox:
+    module_name: mysql_user
+    module_args:
+      login_host: "127.0.0.1"
+      login_port: "3306"
+      login_user: "root"
+      login_password: ""
+      name: "captain"
+      password: "captain"
+      host: "%"
+      priv: "captain.*:ALL"
+      append_privs: "yes"
+  run_once: True
+  when:
+    - database.changed

@@ -1,0 +1,26 @@
+---
+- name: Create nova keypair for Juggernaut
+  become: True
+  kolla_toolbox:
+    module_name: os_keypair
+    module_args:
+      auth: "{{ juggernaut_user_auth }}"
+      cacert: "{{ openstack_cacert }}"
+      endpoint_type: "{{ openstack_interface }}"
+      region_name: "{{ openstack_region_name }}"
+      state: present
+      name: "{{ juggernaut_ssh_key_name }}"
+      public_key: "{{ juggernaut_ssh_key.public_key }}"
+  run_once: True
+  delegate_to: "{{ groups['juggernaut-api'][0] }}"
+
+- name: Copying over Juggernaut SSH key
+  copy:
+    content: "{{ juggernaut_ssh_key.private_key }}"
+    dest: "{{ node_config_directory }}/juggernaut-engine/{{ juggernaut_ssh_key_name }}"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0400"
+  become: True
+  when:
+    - inventory_hostname in groups[juggernaut_services['juggernaut-engine']['group']]

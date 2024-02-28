@@ -1,0 +1,20 @@
+---
+- name: Ensure python mistralclient
+  package:
+    name: "{{ mistralclient }}"
+    state: present
+  tags: mistral
+  when:
+    - with_os_client | bool
+
+- name: create mistral workflows
+  shell: |
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && mistral workflow-get --namespace system {{ item }}"
+    if [ $? -eq 0 ];then
+        {{ docker_cmd }} bash -c "source {{ admin_openrc }} && mistral workflow-update --public --namespace system /usr/share/maine-ansible/roles/post-deploy/files/{{ item }}.yaml"
+    else
+        {{ docker_cmd }} bash -c "source {{ admin_openrc }} && mistral workflow-create --public --namespace system /usr/share/maine-ansible/roles/post-deploy/files/{{ item }}.yaml"
+    fi
+  run_once: True
+  tags: mistral
+  with_items: "{{ workflow_list }}"

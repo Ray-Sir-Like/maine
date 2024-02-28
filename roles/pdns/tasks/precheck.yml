@@ -1,0 +1,20 @@
+---
+- name: Get container facts
+  become: true
+  kolla_container_facts:
+    name:
+      - designate_backend_pdns4
+  check_mode: false
+  register: container_facts
+
+- name: Checking free port for designate backend pdns4 port
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ designate_bind_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - designate_backend == 'pdns4'
+    - container_facts['designate_backend_pdns4'] is not defined
+    - inventory_hostname in groups['designate-backend-pdns4']

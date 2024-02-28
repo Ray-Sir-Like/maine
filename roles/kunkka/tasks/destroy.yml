@@ -1,0 +1,13 @@
+---
+- name: Remove kunkka container instances
+  vars:
+    service_name: "kunkka"
+    service: "{{ kunkka_services[service_name] }}"
+  become: true
+  docker_container:
+    name: "{{ item.value.container_name }}"
+    state: absent
+  with_dict: "{{ kunkka_services }}"
+  when:
+    - inventory_hostname in groups[service.group]
+  tags: kunkka

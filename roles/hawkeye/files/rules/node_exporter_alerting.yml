@@ -1,0 +1,195 @@
+---
+groups:
+- name: system_status
+  rules:
+  - alert: system_has_been_restart
+    expr: (node_time_seconds - node_boot_time_seconds) < 120
+    labels:
+      severity: major
+    annotations:
+      description: '{{ $labels.instance }} 节点在 2 分钟前被重新启动'
+
+# Note(Yao Ning): Use all exporters to identify node down. Maybe not accurate, but effectively now
+- name: system_down
+  rules:
+  - alert: system_down
+    expr: sum by (instance) (up{job !~ "ping.*"}) == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      description: '节点 {{ $labels.instance }} 已宕机'
+
+# Note(Yao Ning): exclude Ping check and node_exporter for node down.
+# If node down, inhibition rule is needed to Suppress this alarm.
+- name: system_exporter_down
+  rules:
+  - alert: system_exporter_down
+    expr: up{job!="node_exporter", job !~ "ping.*" } == 0
+    for: 2m
+    labels:
+      severity: major
+    annotations:
+      description: '监控指标采集器 {{ $labels.instance }} 已停止运行'
+
+- name: network_unreachable
+  rules:
+  - alert: network_unreachable
+    expr: probe_success == 0
+    labels:
+      severity: major
+    annotations:
+      description: "{{ $labels.job }}(IP: { $labels.instance }}) 网络不通"
+
+- name: cpu_load
+  rules:
+  - alert: system_loadavg5_more_than_60
+    expr: node_load5 > 30
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      description: '{{ $labels.instance }} 节点 5 分钟 CPU 平均负载达到 {{ $value | printf "%.1f" }}'
+
+- name: cpu_status
+  rules:
+  - alert: system_cpu_idle_less_than_10%
+    expr: (avg by (instance,host_id) (rate(node_cpu_seconds_total{mode='idle'}[5m])) * 100) < 10
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      description: '{{ $labels.instance }} 节点 CPU 空闲率不足 10%，当前值：{{ $value | printf "%.1f" }}%'
+
+  - alert: system_cpu_io_wait_more_than_30%
+    expr: (avg by (instance,host_id) (rate(node_cpu_seconds_total{mode='iowait'}[3m])) * 100) > 30
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      description: '{{ $labels.instance }} 节点 CPU IO 等待率超过 30%，当前值：{{ $value | printf "%.1f" }}%'
+
+  - alert: system_cpu_softirq_more_than_20%
+    expr: (avg by (instance,host_id) (rate(node_cpu_seconds_total{mode='softirq'}[5m])) * 100) > 20
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      description: '{{ $labels.instance }} 节点 CPU 软中断等待率超过 20%，当前值：{{ $value | printf "%.1f" }}%'
+
+- name: memory_usage
+  rules:
+  - alert: system_mem_available_less_then_10%
+    expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) < 10
+    labels:
+      severity: major
+    annotations:
+      description: '{{ $labels.instance }} 节点内存空闲率小于 10%，当前值：{{ $value | printf "%.1f" }}%'
+
+- name: filesystem_free
+  rules:
+  - alert: system_filesystem_free_less_than_20%
+    expr: (node_filesystem_free_bytes / node_filesystem_size_bytes * 100) < 20
+    labels:
+      severity: warning
+    annotations:
+      description: '{{ $labels.instance }} 节点 {{ $labels.mountpoint }} 目录剩余空间百分比小于 20%，当前值：{{ $value | printf "%.1f" }}%'
+
+- name: filesystem_inode
+  rules:
+  - alert: system_filesystem_inode_less_than_10%
+    expr: (node_filesystem_files_free / node_filesystem_files * 100) < 10
+    labels:
+      severity: warning
+    annotations:
+      description: '{{ $labels.instance }} 节点 {{ $labels.mountpoint }} 目录 Inode 剩余百分比小于 10%，当前值：{{ $value | printf "%.1f" }}%'
+
+- name: system_time
+  rules:
+  - alert: system_ntp_sync_failed
+    expr: node_timex_sync_status == 0
+    labels:
+      severity: major
+    annotations:
+      description: '{{ $labels.instance }} 节点系统时间同步失败'
+
+- name: system_network_speed
+  rules:
+  - alert: network_interface_speed_degrade
+    expr: changes(node_network_speed_bytes[5m]) > 0
+    labels:
+      severity: major
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 网卡速率降级'
+
+  - alert: Network Errors
+    expr: sum by (instance, device) (irate(node_network_receive_drop_total{device=~"(eth|en|bond|ib|mlx|p).*"}[5m]) + irate(node_network_receive_errs_total{device=~"(eth|en|bond|ib|mlx|p).*"}[5m]) + irate(node_network_transmit_drop_total{device=~"(eth|en|bond|ib|mlx|p).*"}[5m]) + irate(node_network_transmit_errs_total{device=~"(eth|en|bond|ib|mlx|p).*"}[5m])) > 1000
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Network Errors"
+      description: "节点 {{ $labels.instance }} 的网络设备（{{ $labels.device }}）在五分钟内发生1000个以上网络包丢失或错误"
+
+- name: system_network_interface
+  rules:
+  - alert: network_interface_speed_error
+    expr: node_network_speed_bytes{device=~"(eth|en|bond|ib|mlx|p).*"} < 125000000 and node_network_speed_bytes{device=~"(eth|en|bond|ib|mlx|p).*"} > 0
+    labels:
+      severity: major
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 速率异常'
+
+- name: system_network_transmit_errs_total
+  rules:
+  - alert: network_receive_errs_total
+    expr: increase(node_network_transmit_errs_total[5m]) > 1000
+    labels:
+      severity: warning
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 存在发送{{ $value | printf "%.1f" }}个错误的数据包'
+
+- name: system_network_receive_errs_total
+  rules:
+  - alert: network_receive_errs_total
+    expr: increase(node_network_receive_errs_total[5m]) > 1000
+    labels:
+      severity: warning
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 存在接受{{ $value | printf "%.1f" }}个错误的数据包'
+
+- name: system_network_receive_drop_total
+  rules:
+  - alert: network_receive_drop_total
+    expr: increase(node_network_receive_drop_total[5m]) > 1000
+    labels:
+      severity: warning
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 存在接受{{ $value | printf "%.1f" }}个丢弃的数据包'
+
+- name: system_network_transmit_drop_total
+  rules:
+  - alert: network_transmit_drop_total
+    expr: increase(node_network_transmit_drop_total[5m]) > 1000
+    labels:
+      severity: warning
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 存在发送{{ $value | printf "%.1f" }}个丢弃的数据包'
+
+- name: system_disk_io
+  rules:
+  - alert: disk_io_holded
+    expr: node_disk_io_time_seconds_total{device=~"sd.*"} == 0
+    labels:
+      severity: major
+    annotations:
+      description: '{{  $labels.instance }} 节点 {{ $labels.device }} 磁盘io堆积'
+
+  - alert: Slow  Device Responses
+    expr: (irate(node_disk_read_time_seconds_total{device=~"^(sd|nvme).*"}[5m]) / clamp_min(irate(node_disk_reads_completed_total{device=~"^(sd|nvme).*"}[5m]), 1) + irate(node_disk_write_time_seconds_total{device=~"^(sd|nvme).*"}[5m]) / clamp_min(irate(node_disk_writes_completed_total{device=~"^(sd|nvme).*"}[5m]), 1)) > 4
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "Slow Device Responses"
+      description: "节点 {{ $labels.instance }} 上的磁盘设备（{{ $labels.device }}）读写响应延时 4s."

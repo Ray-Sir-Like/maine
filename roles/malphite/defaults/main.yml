@@ -1,0 +1,89 @@
+---
+project_name: "malphite"
+
+malphite_services:
+  malphite:
+    container_name: malphite
+    group: malphite
+    enabled: "{{ enable_malphite | bool }}"
+    image: "{{ malphite_image_full }}"
+    volumes: "{{ malphite_default_volumes + malphite_extra_volumes }}"
+    dimensions: "{{ malphite_dimensions }}"
+    healthcheck: "{{ malphite_healthcheck }}"
+    haproxy:
+      malphite:
+        enabled: "{{ enable_malphite }}"
+        mode: "http"
+        external: false
+        port: "{{ malphite_port }}"
+
+####################
+# Docker
+####################
+malphite_install_type: "{{ kolla_install_type }}"
+
+malphite_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/malphite"
+malphite_tag: "{{ openstack_tag }}"
+malphite_image_full: "{{ malphite_image }}:{{ malphite_tag }}"
+
+malphite_dimensions: "{{ default_container_dimensions }}"
+
+malphite_enable_healthchecks: "{{ enable_container_healthchecks }}"
+malphite_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+malphite_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+malphite_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+malphite_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ malphite_port }}/healthcheck"]
+malphite_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+malphite_healthcheck:
+  interval: "{{ malphite_healthcheck_interval }}"
+  retries: "{{ malphite_healthcheck_retries }}"
+  start_period: "{{ malphite_healthcheck_start_period }}"
+  test: "{% if malphite_enable_healthchecks | bool %}{{ malphite_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ malphite_healthcheck_timeout }}"
+
+malphite_default_volumes:
+  - "{{ node_config_directory }}/malphite/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{% if malphite_attachment_storage == 'file_system' %}{{ malphite_attachment_datadir_volume }}:{{ malphite_attachment_file_system_path }}{% endif %}"
+
+malphite_extra_volumes: "{{ default_extra_volumes }}"
+
+####################
+# Database
+####################
+malphite_database_name: "malphite"
+malphite_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}malphite{% endif %}"
+malphite_database_address: "{{ database_address }}:{{ database_port }}"
+
+####################
+# OpenStack
+####################
+malphite_log_level: "{{ 'DEBUG' if openstack_logging_debug | bool else 'INFO' }}"
+
+malphite_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ malphite_port }}"
+malphite_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ malphite_port }}"
+
+malphite_keystone_user: "malphite"
+openstack_malphite_auth: "{{ openstack_auth }}"
+
+malphite_ks_services:
+  - name: "malphite"
+    type: "ticket"
+    description: "OpenStack Ticket Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ malphite_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ malphite_internal_endpoint }}'}
+
+malphite_ks_users:
+  - project: "service"
+    user: "{{ malphite_keystone_user }}"
+    password: "{{ malphite_keystone_password }}"
+    role: "admin"
+
+malphite_s3_access_key: "{{ s3_system_access_key }}"
+malphite_s3_secret_key: "{{ s3_system_secret_key }}"
+
+malphite_attachment_storage: "{{ 's3' if enable_s3 | bool else 'file_system' }}"
+malphite_attachment_datadir_volume: "malphite"
+malphite_attachment_file_system_path: "/var/lib/malphite/data"

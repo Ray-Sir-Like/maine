@@ -1,0 +1,45 @@
+---
+- name: "Get {{ username }} user options"
+  shell: |
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && openstack user show {{ username }} -f value -c options"
+  run_once: True
+  register: user_options
+  changed_when: false
+  tags: always
+
+- name: "Get token for update {{ username }} user"
+  shell: |
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && openstack token issue -c id -f value"
+  run_once: True
+  register: user_token
+  changed_when: false
+  tags: always
+  when: user_options.stdout == "{}" or 'False' in user_options.stdout
+
+- name: "Get {{ username }} user id"
+  shell: |
+    {{ docker_cmd }} bash -c "source {{ admin_openrc }} && openstack user show {{ username }} -c id -f value"
+  run_once: True
+  register: user_id
+  changed_when: false
+  tags: always
+  when: user_options.stdout == "{}" or 'False' in user_options.stdout
+
+- name: "Update {{ username }} user security compliance"
+  uri:
+    url: "{{ keystone_admin_url }}/v3/users/{{ user_id.stdout }}"
+    method: PATCH
+    headers:
+      Accept: application/json
+      X-Auth-Token: "{{ user_token.stdout }}"
+    body_format: json
+    body:
+      user:
+        options:
+          ignore_lockout_failure_attempts: true
+          ignore_change_password_upon_first_use: true
+          ignore_password_expiry: true
+    validate_certs: False
+  run_once: True
+  tags: always
+  when: user_options.stdout == "{}" or 'False' in user_options.stdout

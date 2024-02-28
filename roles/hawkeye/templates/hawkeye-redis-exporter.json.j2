@@ -1,0 +1,11 @@
+{
+    "command": "/opt/redis_exporter/redis_exporter --redis.addr=redis://{{ api_interface_address }}:{{ redis_port }} --redis.password={{ redis_master_password }} --web.listen-address={{ monitoring_interface_address }}:{{ hawkeye_redis_exporter_port }}",
+    "config_files": [],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/hawkeye",
+            "owner": "root:kolla",
+            "recurse": true
+        }
+    ]
+}

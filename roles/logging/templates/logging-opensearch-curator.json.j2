@@ -1,0 +1,32 @@
+{% set cron_cmd = 'cron -f' if kolla_base_distro in ['ubuntu', 'debian'] else 'crond -s -n' %}
+{% set cron_path = '/var/spool/cron/crontabs/opensearch' if kolla_base_distro in ['ubuntu', 'debian'] else '/var/spool/cron/opensearch' %}
+{
+    "command": "{{ cron_cmd }}",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/opensearch-curator.crontab",
+            "dest": "{{ cron_path }}",
+            "owner": "opensearch",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/opensearch-curator.yml",
+            "dest": "/etc/opensearch-curator/curator.yml",
+            "owner": "opensearch",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/opensearch-curator-actions.yml",
+            "dest": "/etc/opensearch-curator/actions.yml",
+            "owner": "opensearch",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/opensearch",
+            "owner": "opensearch:opensearch",
+            "recurse": true
+        }
+    ]
+}

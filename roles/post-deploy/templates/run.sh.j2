@@ -1,0 +1,78 @@
+{% raw %}
+#!/bin/bash -x
+
+EXTRA_OPTS=$@
+
+activate_env () {
+    . /var/lib/rally/admin-openrc
+}
+
+run () {
+    # waiting for uploading image being active
+    while true
+    do
+        if [ `openstack image list -c Status -f value | grep -v tempest | grep -v "active" | wc -l` = 0 ]
+        then
+            break
+        else
+            sleep 10
+        fi
+    done
+
+    # 确保数据库存在
+    rally db ensure
+
+    # 创建 deployment
+    rally deployment create --name remote --fromenv || true
+    rally deployment use remote
+
+    # 创建 verifier
+    rally verify create-verifier --name remote --type tempest --source http://git-mirror.ustack.com/openstack/tempest --version 8def25cbb5885e91899793f8575d3919816a0d12 --system-wide || true
+
+    # TODO(Xing Zhang): 测试环境使用 config-drive，测试通过后更新 nova 配置文件或 glance 上传镜像脚本
+    openstack image set --property img_config_drive=mandatory 'CentOS 7'
+
+    # 设置 extra-options.txt
+    crudini --set /var/log/kolla/rally/extra-options.txt network public_network_id `openstack network list --external -f value -c ID`
+    crudini --set /var/log/kolla/rally/extra-options.txt compute image_ref `openstack image show "CentOS 7" -f value -c id`
+    crudini --set /var/log/kolla/rally/extra-options.txt compute image_ref_alt `openstack image show "CentOS 7" -f value -c id`
+    crudini --set /var/log/kolla/rally/extra-options.txt compute flavor_ref `openstack flavor show "rally_flavor" -f value -c id`
+    crudini --set /var/log/kolla/rally/extra-options.txt compute flavor_ref_alt `openstack flavor show "rally_flavor_alt" -f value -c id`
+    crudini --set /var/log/kolla/rally/extra-options.txt compute fixed_network_name rally-net
+    crudini --set /var/log/kolla/rally/extra-options.txt swallow access_key `openstack ec2 credentials list -f value -c Access`
+    crudini --set /var/log/kolla/rally/extra-options.txt swallow secret_key `openstack ec2 credentials list -f value -c Secret`
+
+    if [ `openstack service list --c Name -f value | grep manila | wc -l` -ne 0 ];then
+        crudini --set /var/log/kolla/rally/extra-options.txt share client_vm_flavor_ref `openstack flavor show "rally_flavor" -f value -c id`
+        crudini --set /var/log/kolla/rally/extra-options.txt share default_share_type_name `manila type-list --columns "id,name" | grep cephfs | awk '{print $2}'`
+    fi
+
+    # 根据组件特性修改 extra-options.txt
+    rally verify configure-verifier --id remote --extend /var/log/kolla/rally/extra-options.txt
+
+    # 某些组件会去读取/etc/tempest/tempest.conf，如barbican和ironic
+    sudo mkdir -p /etc/tempest && sudo touch /etc/tempest/tempest.conf
+    sudo chown rally:rally /etc/tempest/tempest.conf
+    rally verify configure-verifier --show >  /etc/tempest/tempest.conf
+
+    # change_password must be waiting server SSHABLE
+    sed "/Newpass1234/a\        import time\n        time.sleep(600)" -i /var/lib/rally/.rally/verification/verifier-*/repo/tempest/api/compute/servers/test_server_actions.py
+
+
+    # Don't use ironic-compute as vm host
+    sed  "/for host in zone/a\                    if \"ironic\" in host:\n                        continue" -i /var/lib/rally/.rally/verification/*/repo/tempest/scenario/test_server_multinode.py
+
+    # i18n issue
+    sed "s/^        return 'exceed' in resp_body.get('message', 'blabla')$/        return 'Exceed' in resp_body.get('message', 'blabla')/" -i /var/lib/rally/.rally/verification/verifier-*/repo/tempest/lib/common/rest_client.py
+
+    # 运行测试
+    rally verify start --id remote ${EXTRA_OPTS}
+
+    # 生成测试报告（指定ID）
+    verify_uuid=`rally verify list | grep remote | awk '{print $2}'`
+    rally verify report --uuid ${verify_uuid} --type html-static --to /var/log/kolla/rally/ci_result.html
+}
+
+activate_env
+run
+{% endraw %}

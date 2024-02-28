@@ -1,0 +1,19 @@
+---
+- name: Ensure furion directory exists
+  file:
+    path: "/etc/furion"
+    state: directory
+  become: true
+
+- name: Copying over furion conf
+  vars:
+    service_name: "{{ item.key }}"
+  template:
+    src: "{{ item.key }}.conf.j2"
+    dest: "/etc/furion/{{ item.key }}.conf"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ furion_services }}"

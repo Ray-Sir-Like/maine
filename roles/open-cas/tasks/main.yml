@@ -1,0 +1,93 @@
+---
+- name: Check open-cas already installed on destination hosts
+  command: modinfo cas_cache
+  register: open_cas_status
+  failed_when: false
+
+- name: Install open-cas from source
+  block:
+    - name: Install source compile dependence
+      become: True
+      package:
+        name:
+          - gcc
+          - make
+        state: present
+
+    - name: Install open-cas
+      command: "{{ item }}"
+      args:
+        chdir: /tmp/open-cas-linux/
+      with_items:
+        - ./configure
+        - make -j4
+        - make install
+  when: open_cas_status.rc != 0
+
+- name: Get SSD Cache Devices
+  set_fact:
+    ssd_cache_devices: "{{ ssd_cache_devices | default([]) + [ item.value ] }}"
+  when:
+    - not (item.value.rotational | bool)
+    - item.value.partitions | length == 0
+    - '"cas" not in item.key'
+    - '"sr0" not in item.key'
+    - '"dm" not in item.key'
+  loop: "{{ hostvars[inventory_hostname].ansible_devices | dict2items }}"
+
+- name: Get Unused HDD Devices
+  set_fact:
+    hdd_non_cache_devices: "{{ hdd_non_cache_devices | default([]) + [ item.value ]}}"
+  when:
+    - item.value.rotational | bool
+    - item.value.partitions | length == 0
+    - '"cas" not in item.key'
+    - '"sr0" not in item.key'
+    - '"dm" not in item.key'
+  loop: "{{ hostvars[inventory_hostname].ansible_devices | dict2items }}"
+
+- name: Copy open-cas.conf
+  become: True
+  template:
+    src: opencas.conf.j2
+    dest: /etc/opencas/opencas.conf
+
+- name: install cas_cache kernel mod
+  become: True
+  modprobe:
+    name: cas_cache
+    state: present
+
+- name: Check cache is already running
+  become: True
+  command: casadm -L -o csv
+  register: cache_running_state
+
+- name: Init open-cas devices
+  command: casctl init
+  become: True
+  when: '"No caches running" in cache_running_state.stdout'
+
+- name: Configure LVM type
+  become: True
+  lineinfile:
+    dest: /etc/lvm/lvm.conf
+    regexp: '# types ='
+    line: '        types = [ "cas", 16 ]'
+    state: present
+
+- name: Configure LVM filter
+  become: True
+  lineinfile:
+    dest: /etc/lvm/lvm.conf
+    regexp: '# global_filter ='
+    line: '        global_filter = [ "r|^/dev/sd|", "r|^/dev/nvme|" ]'
+    state: present
+
+- name: Update Systemd Udev TimeoutStartSec
+  command: crudini --set /usr/lib/systemd/system/systemd-udevd.service Service TimeoutStartSec 1200
+  become: True
+
+- name: Update Systemd Udev Setlle TimeoutStartSec
+  command: crudini --set /usr/lib/systemd/system/systemd-udev-settle.service Service TimeoutStartSec 1500
+  become: True

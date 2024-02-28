@@ -1,0 +1,522 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Integrate External Ceph
+  hosts: deployment
+  gather_facts: false
+  vars:
+    container_image: "{{ docker_registry }}/uds3/udscore:{{ ceph_release }}"
+    container_binary: "docker"
+    container_exec_cmd: "cephadm shell"
+  tasks:
+    - name: Create Minimal conf as a default
+      command: >
+        {{ container_exec_cmd }} -- ceph config generate-minimal-conf
+      register: minimal_ceph_config
+      delegate_to: "{{ groups['ceph'][0] }}"
+      run_once: True
+
+    - name: Set minimal_config_config_content vars
+      set_fact:
+        minimal_ceph_config_content: "{{ minimal_ceph_config['stdout'] | default('') }}{{ '\n' }}"
+
+    - name: Create OpenStack Pools
+      ceph_pool:
+        name: "{{ item.name }}"
+        pg_num: "{{ item.pg_num | default(omit) }}"
+        pgp_num: "{{ item.pgp_num | default(omit) }}"
+        size: "{{ item.size | default(omit) }}"
+        min_size: "{{ item.min_size | default(omit) }}"
+        pool_type: "{{ item.type | default('replicated') }}"
+        rule_name: "{{ item.rule_name | default(omit) }}"
+        erasure_profile: "{{ item.erasure_profile | default(omit) }}"
+        pg_autoscale_mode: "{{ item.pg_autoscale_mode | default(omit) }}"
+        target_size_ratio: "{{ item.target_size_ratio | default(omit) }}"
+        application: "{{ item.application | default(omit) }}"
+      with_items: "{{ openstack_pools }}"
+      delegate_to: "{{ groups['ceph'][0] }}"
+      environment:
+        CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+        CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+
+    - name: create the rgw system user(s)
+      radosgw_user:
+        name: "openstack"
+        display_name: "OpenStack Service Admin User"
+        access_key: "{{ s3_system_access_key }}"
+        secret_key: "{{ s3_system_secret_key }}"
+        system: true
+      delegate_to: "{{ groups['ceph'][0] }}"
+      run_once: true
+      environment:
+        CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+        CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+      when:
+        - enable_s3 | bool
+
+    - name: Create OpenStack Auth Keyring in Ceph
+      block:
+        - name: validate openstack_keys key format
+          fail:
+            msg: '{{ item.name }} key format invalid'
+          with_items: '{{ openstack_keys }}'
+          when:
+            - openstack_keys is defined
+            - openstack_keys | length > 0
+            - item.key is defined
+            - item.key is not match("^[a-zA-Z0-9+/]{38}==$")
+
+        - name: validate openstack_keys caps
+          fail:
+            msg: '{{ item.name }} key has no caps defined'
+          with_items: '{{ openstack_keys }}'
+          when:
+            - openstack_keys is defined
+            - openstack_keys | length > 0
+            - item.caps is not defined
+
+        - name: generate keys
+          ceph_key:
+            name: "{{ item.name }}"
+            caps: "{{ item.caps }}"
+            secret: "{{ item.key | default('') }}"
+            mode: "{{ item.mode | default(ceph_keyring_permissions) }}"
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          with_items: "{{ openstack_keys }}"
+          delegate_to: "{{ groups['ceph'][0] }}"
+
+    - name: Pulling Ceph Auth Keyring for Cinder-Backup Service
+      block:
+        - name: Pulling cephx cinder keyring for cinder backup
+          ceph_key:
+            name: "client.{{ ceph_cinder_user_name }}"
+            state: info
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          register: cephx_key_cinder_for_cinder_backup
+          delegate_to: "{{ groups['ceph'][0] }}"
+          run_once: True
+
+        - name: Make sure the cinder backup directory exists
+          file:
+            path: "{{ node_custom_config }}/cinder/cinder-backup"
+            state: directory
+
+        - name: Checking cephx cinder keyring for cinder backup exists
+          stat:
+            path: "{{ node_custom_config }}/cinder/cinder-backup/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+          become: true
+          register: cinder_backup_cephx_keyring
+
+        - name: Pushing cephx cinder keyring for cinder backup
+          copy:
+            content: |
+              [client.{{ ceph_cinder_user_name }}]
+              key = {{ (cephx_key_cinder_for_cinder_backup.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/cinder/cinder-backup/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+            mode: "0600"
+          when: not cinder_backup_cephx_keyring.stat.exists
+          become: true
+      when:
+        - enable_cinder | bool
+        - enable_cinder_backup | bool
+        - cinder_backend_ceph | bool
+
+    - name: Pulling Ceph Auth Keyring for Cinder Service
+      block:
+        - name: Pulling cephx keyring for cinder
+          ceph_key:
+            name: "client.{{ ceph_cinder_user_name }}"
+            state: info
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          register: cephx_key_cinder
+          delegate_to: "{{ groups['ceph'][0] }}"
+          run_once: True
+
+        - name: Make sure the cinder directory exists
+          file:
+            path: "{{ node_custom_config }}/cinder/cinder-volume"
+            state: directory
+
+        - name: Checking cephx keyring for cinder exists
+          stat:
+            path: "{{ node_custom_config }}/cinder/cinder-volume/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+          become: true
+          register: cinder_cephx_keyring
+
+        - name: Pushing cephx keyring for cinder
+          copy:
+            content: |
+              [client.{{ ceph_cinder_user_name }}]
+              key = {{ (cephx_key_cinder.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/cinder/cinder-volume/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+            mode: "0600"
+          when: not cinder_cephx_keyring.stat.exists
+          become: true
+
+        - name: Checking cinder ceph configuration exists
+          stat:
+            path: "{{ node_custom_config }}/cinder/ceph.conf"
+          become: true
+          register: cinder_ceph_configuration
+
+        - name: Pushing cinder ceph configuration
+          copy:
+            content: |
+              {{ minimal_ceph_config_content }}
+            dest: "{{ node_custom_config }}/cinder/ceph.conf"
+            mode: "0600"
+          when: not cinder_ceph_configuration.stat.exists
+
+        - name: Checking cinder configuration exists
+          stat:
+            path: "{{ node_custom_config }}/cinder/cinder-volume.conf"
+          become: true
+          register: cinder_configuration
+
+        - name: Pushing cinder configuration
+          copy:
+            content: |
+              [DEFAULT]
+              enabled_backends={% if enable_cinder_hdd_backend|bool %}{{ cinder_hdd_backend_name }},{% endif %}{% if enable_cinder_ssd_backend|bool %}{{ cinder_ssd_backend_name }},{% endif %}{% if enable_cinder_hybrid_backend|bool %}{{ cinder_hybrid_backend_name }},{% endif %}{% if enable_cinder_generic_backend|bool %}{{ cinder_generic_backend_name }}{% endif %}
+
+              {% if enable_cinder_hdd_backend|bool %}
+              [{{ cinder_hdd_backend_name }}]
+              rbd_ceph_conf=/etc/ceph/ceph.conf
+              rbd_user={{ ceph_cinder_user_name }}
+              backend_host=rbd:hdd_volumes
+              rbd_pool={{ cinder_hdd_backend_pool }}
+              volume_backend_name={{ cinder_hdd_backend_name }}
+              volume_driver=cinder.volume.drivers.rbd.RBDDriver
+              rbd_secret_uuid = {{ cinder_rbd_secret_uuid }}
+              {% endif %}
+
+              {% if enable_cinder_ssd_backend|bool %}
+              [{{ cinder_ssd_backend_name }}]
+              rbd_ceph_conf=/etc/ceph/ceph.conf
+              rbd_user={{ ceph_cinder_user_name }}
+              backend_host=rbd:ssd_volumes
+              rbd_pool={{ cinder_ssd_backend_pool }}
+              volume_backend_name={{ cinder_ssd_backend_name }}
+              volume_driver=cinder.volume.drivers.rbd.RBDDriver
+              rbd_secret_uuid = {{ cinder_rbd_secret_uuid }}
+              {% endif %}
+
+              {% if enable_cinder_hybrid_backend|bool %}
+              [{{ cinder_hybrid_backend_name }}]
+              rbd_ceph_conf=/etc/ceph/ceph.conf
+              rbd_user={{ ceph_cinder_user_name }}
+              backend_host=rbd:hybrid_volumes
+              rbd_pool={{ cinder_hybrid_backend_pool }}
+              volume_backend_name={{ cinder_hybrid_backend_name }}
+              volume_driver=cinder.volume.drivers.rbd.RBDDriver
+              rbd_secret_uuid = {{ cinder_rbd_secret_uuid }}
+              {% endif %}
+
+              {% if enable_cinder_generic_backend|bool %}
+              [{{ cinder_generic_backend_name }}]
+              rbd_ceph_conf=/etc/ceph/ceph.conf
+              rbd_user={{ ceph_cinder_user_name }}
+              backend_host=rbd:volumes
+              rbd_pool={{ cinder_generic_backend_pool }}
+              volume_backend_name={{ cinder_generic_backend_name }}
+              volume_driver=cinder.volume.drivers.rbd.RBDDriver
+              rbd_secret_uuid = {{ cinder_rbd_secret_uuid }}
+              {% endif %}
+
+            dest: "{{ node_custom_config }}/cinder/cinder-volume.conf"
+            mode: "0600"
+          when: not cinder_configuration.stat.exists
+      when:
+        - enable_cinder | bool
+
+    - name: Pulling Ceph Auth Keyring for Glance Service
+      block:
+        - name: Pulling cephx keyring for glance
+          ceph_key:
+            name: "client.{{ ceph_glance_user_name }}"
+            state: info
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          register: cephx_key_glance
+          delegate_to: "{{ groups['ceph'][0] }}"
+          run_once: True
+
+        - name: Make sure the glance directory exists
+          file:
+            path: "{{ node_custom_config }}/glance"
+            state: directory
+
+        - name: Checking cephx keyring for glance exists
+          stat:
+            path: "{{ node_custom_config }}/glance/ceph.client.{{ ceph_glance_user_name }}.keyring"
+          become: true
+          register: glance_cephx_keyring
+
+        - name: Pushing cephx keyring for glance
+          copy:
+            content: |
+              [client.{{ ceph_glance_user_name }}]
+              key = {{ (cephx_key_glance.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/glance/ceph.client.{{ ceph_glance_user_name }}.keyring"
+            mode: "0600"
+          when: not glance_cephx_keyring.stat.exists
+          become: true
+
+        - name: Checking glance ceph configuration exists
+          stat:
+            path: "{{ node_custom_config }}/glance/ceph.conf"
+          become: true
+          register: glance_ceph_configuration
+
+        - name: Pushing glance ceph configuration
+          copy:
+            content: |
+              {{ minimal_ceph_config_content }}
+            dest: "{{ node_custom_config }}/glance/ceph.conf"
+            mode: "0600"
+          when: not glance_ceph_configuration.stat.exists
+
+    - name: Pulling Ceph Auth Keyring for Manila Service
+      block:
+        - name: Pulling cephx keyring for manila
+          ceph_key:
+            name: "client.{{ ceph_manila_user_name }}"
+            state: info
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          register: cephx_key_manila
+          delegate_to: "{{ groups['ceph'][0] }}"
+          run_once: True
+
+        - name: Make sure the manila directory exists
+          file:
+            path: "{{ node_custom_config }}/manila"
+            state: directory
+
+        - name: Checking cephx keyring for manila exists
+          stat:
+            path: "{{ node_custom_config }}/manila/ceph.client.{{ ceph_manila_user_name }}.keyring"
+          become: true
+          register: manila_cephx_keyring
+
+        - name: Pushing cephx keyring for manila
+          copy:
+            content: |
+              [client.{{ ceph_manila_user_name }}]
+              key = {{ (cephx_key_manila.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/manila/ceph.client.{{ ceph_manila_user_name }}.keyring"
+            mode: "0600"
+          when: not manila_cephx_keyring.stat.exists
+          become: true
+
+        - name: Checking manila ceph configuration exists
+          stat:
+            path: "{{ node_custom_config }}/manila/ceph.conf"
+          become: true
+          register: manila_ceph_configuration
+
+        - name: Pushing manila ceph configuration
+          copy:
+            content: |
+              {{ minimal_ceph_config_content }}
+            dest: "{{ node_custom_config }}/manila/ceph.conf"
+            mode: "0600"
+          when: not manila_ceph_configuration.stat.exists
+      when:
+        - enable_manila | bool
+
+    - name: Pulling Ceph Auth Keyring for Nova Service
+      block:
+        - name: Pulling cephx keyring for nova
+          ceph_key:
+            name: "client.{{ ceph_nova_user_name }}"
+            state: info
+          environment:
+            CEPH_CONTAINER_IMAGE: "{{ container_image }}"
+            CEPH_CONTAINER_BINARY: "{{ container_binary }}"
+          register: cephx_key_nova
+          delegate_to: "{{ groups['ceph'][0] }}"
+          run_once: True
+
+        - name: Make sure the nova directory exists
+          file:
+            path: "{{ node_custom_config }}/nova"
+            state: directory
+
+        - name: Checking cinder cephx keyring for nova exists
+          stat:
+            path: "{{ node_custom_config }}/nova/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+          become: true
+          register: cinder_cephx_keyring_for_nova
+
+        - name: Pushing cinder cephx keyring for nova
+          copy:
+            content: |
+              [client.{{ ceph_cinder_user_name }}]
+              key = {{ (cephx_key_cinder.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/nova/ceph.client.{{ ceph_cinder_user_name }}.keyring"
+            mode: "0600"
+          when: not cinder_cephx_keyring_for_nova.stat.exists
+          become: true
+
+        - name: Checking cephx keyring for nova exists
+          stat:
+            path: "{{ node_custom_config }}/nova/ceph.client.{{ ceph_nova_user_name }}.keyring"
+          become: true
+          register: nova_cephx_keyring
+
+        - name: Pushing cephx keyring for nova
+          copy:
+            content: |
+              [client.{{ ceph_nova_user_name }}]
+              key = {{ (cephx_key_nova.stdout | from_json)[0].key }}
+            dest: "{{ node_custom_config }}/nova/ceph.client.{{ ceph_nova_user_name }}.keyring"
+            mode: "0600"
+          when: not nova_cephx_keyring.stat.exists
+          become: true
+
+        - name: Checking nova ceph configuration exists
+          stat:
+            path: "{{ node_custom_config }}/nova/ceph.conf"
+          become: true
+          register: nova_ceph_configuration
+
+        - name: Pushing nova ceph configuration
+          copy:
+            content: |
+              {{ minimal_ceph_config_content }}
+            dest: "{{ node_custom_config }}/nova/ceph.conf"
+            mode: "0600"
+          when: not nova_ceph_configuration.stat.exists
+
+        - name: Checking nova configuration exists
+          stat:
+            path: "{{ node_custom_config }}/nova/nova-compute.conf"
+          become: true
+          register: nova_configuration
+
+        - name: Pushing nova configuration
+          copy:
+            content: |
+              [libvirt]
+              images_rbd_pool={{ ceph_nova_pool_name }}
+              images_type=rbd
+              images_rbd_ceph_conf=/etc/ceph/ceph.conf
+              rbd_user={{ ceph_nova_user_name }}
+            dest: "{{ node_custom_config }}/nova/nova-compute.conf"
+            mode: "0600"
+          when: not nova_configuration.stat.exists
+      when:
+        - enable_cinder | bool
+        - enable_nova | bool
+
+- name: Integrate Keystone with Ceph Object Gateway
+  hosts: ceph
+  gather_facts: false
+  vars:
+    container_image: "{{ docker_registry }}/uds3/udscore:{{ ceph_release }}"
+    container_binary: "docker"
+    container_exec_cmd: "cephadm shell"
+  tasks:
+    - name: Integrate Ceph Object Gateway to Use Keystone Authentication
+      block:
+        - name: set rgw s3 auth use keystone
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_s3_auth_use_keystone
+            value: "true"
+
+        # FIXME(Yao Ning): ssl may need and use by ceph rgw, but nss certs should be generated
+        # Ref: https://access.redhat.com/documentation/en-us/red_hat_ceph_storage/5/html-single/object_gateway_guide/index#configuring-the-ceph-object-gateway-to-use-keystone-ssl_rgw
+        - name: disable ssl verify for rgw keystone
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_verify_ssl
+            value: "false"
+
+        - name: set rgw keystone access url
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_url
+            value: "{{ keystone_public_url }}"
+
+        - name: set rgw keystone admin user
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_admin_user
+            value: "{{ ceph_rgw_keystone_user }}"
+
+        - name: set rgw keystone admin password
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_admin_password
+            value: "{{ ceph_rgw_keystone_password }}"
+
+        - name: set rgw keystone admin tenant
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_admin_tenant
+            value: "service"
+
+        - name: set rgw keystone admin domain
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_admin_domain
+            value: "default"
+
+        - name: set rgw keystone api version
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_api_version
+            value: "3"
+
+        - name: set rgw keystone accepted roles
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_accepted_roles
+            value: "admin,_member_,member"
+
+        - name: set rgw keystone accepted admin roles
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_accepted_admin_roles
+            value: "ResellerAdmin"
+
+        - name: set rgw keystone token cache size
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_token_cache_size
+            value: "500"
+
+        - name: set rgw keystone implicit tenants
+          ceph_config:
+            action: set
+            who: client.rgw
+            option: rgw_keystone_implicit_tenants
+            value: "false"
+
+        - name: restart rgw service
+          command: >
+            {{ container_exec_cmd }} -- ceph orch restart rgw.{{ ceph_rgw_realm }}.{{ ceph_rgw_zone }}
+      run_once: True
+      when:
+        - enable_s3 | bool or enable_swift | bool

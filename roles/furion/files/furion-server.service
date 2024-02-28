@@ -1,0 +1,10 @@
+[Unit]
+Description=Furion Server
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/furion-server --config /etc/furion/furion-server.conf
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

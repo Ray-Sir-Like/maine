@@ -1,0 +1,15 @@
+---
+- import_tasks: register.yml
+  when: inventory_hostname in groups['shadowfiend-api']
+
+- import_tasks: config.yml
+  when: inventory_hostname in groups['shadowfiend-api'] or
+        inventory_hostname in groups['shadowfiend-engine'] or
+        inventory_hostname in groups['shadowfiend-monitor']
+
+- import_tasks: check-containers.yml
+
+- import_tasks: bootstrap.yml
+
+- name: Flush handlers
+  meta: flush_handlers

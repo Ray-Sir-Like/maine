@@ -1,0 +1,5 @@
+---
+- name: Check pacemaker rabbitmq resource existed
+  command: >
+      docker exec hacluster_pacemaker pcs resource disable rabbitmq-bundle
+  run_once: True

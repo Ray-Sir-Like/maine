@@ -1,0 +1,33 @@
+[DEFAULT]
+
+#
+# From neutron.uplugin
+#
+
+# Default rate limit.(MB) (integer value)
+#rate = 10
+
+# Recover ratelimit records form datebase when restart (boolean value)
+#ratelimit_sync = true
+
+# Recover portforwarding records form datebase when restart (boolean value)
+#portforwarding_sync = true
+
+
+[QUOTAS]
+
+#
+# From neutron.uplugin
+#
+
+# number of fipratelimit allowed per tenant. a negative value means unlimited.
+# (integer value)
+#quota_fipratelimit = 20
+
+# Number of gwratelimit allowed per tenant. A negative value means unlimited.
+# (integer value)
+#quota_gwratelimit = 50
+
+# Number of portforwarding rules allowed per tenant. A negative value means
+# unlimited. (integer value)
+#quota_portforwarding = 100

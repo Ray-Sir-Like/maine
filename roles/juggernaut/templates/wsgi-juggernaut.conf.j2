@@ -1,0 +1,25 @@
+{% set juggernaut_log_dir = '/var/log/kolla/juggernaut' %}
+{% set binary_path = '/usr/bin' if kolla_install_type == 'binary' else '/var/lib/kolla/venv/bin' %}
+Listen {{ api_interface_address }}:{{ juggernaut_api_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<VirtualHost *:{{ juggernaut_api_port }}>
+
+  ErrorLog "{{ juggernaut_log_dir }}/juggernaut-api-error.log"
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "{{ juggernaut_log_dir }}/juggernaut-api-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess juggernaut group=juggernaut processes={{ openstack_service_workers }} threads=1 user=juggernaut
+  WSGIProcessGroup juggernaut
+  WSGIScriptAlias / "{{ binary_path }}/juggernaut-api-wsgi"
+
+  <Directory "{{ binary_path }}">
+       <FilesMatch "^juggernaut-api-wsgi$">
+            Require all granted
+       </FilesMatch>
+  </Directory>
+
+</VirtualHost>

@@ -1,0 +1,112 @@
+---
+- name: Delete mariadb resource in pacemaker
+  command: >
+    docker exec hacluster_pacemaker pcs resource delete mariadb-bundle
+  register: mariadb_pcs_resource_delete
+  failed_when:
+    - mariadb_pcs_resource_delete.rc != 0
+    - '"does not exist" not in mariadb_pcs_resource_delete.stderr'
+  run_once: True
+  when:
+    - mariadb_force_update | bool
+
+- name: Check pacemaker mariadb resource existed
+  command: >
+    docker exec hacluster_pacemaker pcs resource config mariadb-bundle
+  register: mariadb_pcs_resource_existed
+  failed_when:
+    - mariadb_pcs_resource_existed.rc != 0
+    - '"unable to find resource" not in mariadb_pcs_resource_existed.stderr'
+    - '"No resource found" not in mariadb_pcs_resource_existed.stderr'
+  run_once: True
+
+- name: Ensure pacemaker config directory existed
+  file:
+    path: /etc/pacemaker
+    state: directory
+    mode: '0755'
+
+- name: Copy pacemaker authkey for mariadb
+  copy:
+    src: /etc/kolla/hacluster-pacemaker/authkey
+    dest: /etc/pacemaker/authkey
+    mode: '0644'
+    remote_src: true
+
+- name: Create pacemaker resource for mariadb
+  block:
+    - name: Create mariadb bundle resource in pacemaker
+      command: >
+        docker exec hacluster_pacemaker pcs resource bundle create mariadb-bundle container docker
+        image={{ mariadb_image }}:{{ mariadb_tag }}
+        replicas={{ mariadb_nodes_count }} promoted-max={{ mariadb_nodes_count }}
+        options="--user=root --log-driver=journald -e KOLLA_CONFIG_STRATEGY=COPY_ALWAYS -e LANG=en_US.UTF-8 -e LC_ALL=en_US.UTF-8 -e MYSQL_USERNAME=root -e MYSQL_PASSWORD={{ database_password }} -e MYSQL_HOST=localhost"
+        run-command="/bin/bash /usr/local/bin/kolla_start"
+        network=host
+        storage-map id=mariadb-cfg-files source-dir=/etc/kolla/mariadb/ target-dir=/var/lib/kolla/config_files/ options=ro
+        storage-map id=mariadb-localtime source-dir=/etc/localtime target-dir=/etc/localtime options=ro
+        storage-map id=mariadb-data source-dir=mariadb target-dir=/var/lib/mysql/ options=rw
+        storage-map id=mariadb-logs source-dir=kolla_logs target-dir=/var/log/kolla/ options=rw
+        storage-map id=mariadb-syslog source-dir=/dev/log target-dir=/dev/log options=rw
+        network control-port={{ mariadb_pcs_control_port }} --disabled
+      run_once: True
+
+    - name: Create mariadb resource in pacemaker
+      command: >
+        docker exec hacluster_pacemaker pcs resource create mariadb
+        ocf:heartbeat:galera
+        log='/var/log/kolla/mariadb/mariadb.log'
+        additional_parameters='--open-files-limit=65536'
+        enable_creation=true
+        wsrep_cluster_address={{ mariadb_wsrep_cluster_address }}
+        cluster_host_map={{ mariadb_cluster_host_map_string }}{{ mariadb_two_node_mode }}
+        meta master-max={{ mariadb_nodes_count }} ordered=true container-attribute-target=host
+        op promote timeout={{ mariadb_promote_timeout }}s on-fail=block
+        bundle mariadb-bundle --disabled
+      run_once: True
+  when:
+    - mariadb_pcs_resource_existed.rc != 0
+
+- name: Delete mariadb clustercheck resource in pacemaker
+  command: >
+    docker exec hacluster_pacemaker pcs resource delete mariadb-clustercheck-bundle
+  register: mariadb_clustercheck_pcs_resource_delete
+  failed_when:
+    - mariadb_clustercheck_pcs_resource_delete.rc != 0
+    - '"does not exist" not in mariadb_clustercheck_pcs_resource_delete.stderr'
+  run_once: True
+  when:
+    - mariadb_force_update | bool
+
+- name: Check pacemaker mariadb clustercheck resource existed
+  command: >
+    docker exec hacluster_pacemaker pcs resource config mariadb-clustercheck-bundle
+  register: mariadb_clustercheck_pcs_resource_existed
+  failed_when:
+    - mariadb_clustercheck_pcs_resource_existed.rc != 0
+    - '"unable to find resource" not in mariadb_clustercheck_pcs_resource_existed.stderr'
+    - '"No resource found" not in mariadb_clustercheck_pcs_resource_existed.stderr'
+  run_once: True
+
+- name: Prepare clustercheck config file
+  template:
+    src: clustercheck.j2
+    dest: /etc/sysconfig/clustercheck
+
+- name: Create mariadb clustercheck bundle resource in pacemaker
+  command: >
+    docker exec hacluster_pacemaker pcs resource bundle create mariadb-clustercheck-bundle container docker
+    image={{ mariadb_clustercheck_image }}:{{ mariadb_clustercheck_tag }}
+    replicas={{ mariadb_nodes_count }}
+    options="--user=root --log-driver=journald -e KOLLA_CONFIG_STRATEGY=COPY_ALWAYS -e LANG=en_US.UTF-8 -e LC_ALL=en_US.UTF-8"
+    run-command="/bin/bash /usr/local/bin/kolla_start"
+    network=host
+    storage-map id=mariadb-clustercheck-cfg-files source-dir=/etc/kolla/mariadb-clustercheck/ target-dir=/var/lib/kolla/config_files/ options=ro
+    storage-map id=mariadb-clustercheck-cfg source-dir=/etc/sysconfig/clustercheck target-dir=/etc/sysconfig/clustercheck options=ro
+    storage-map id=mariadb-clustercheck-localtime source-dir=/etc/localtime target-dir=/etc/localtime options=ro
+    storage-map id=mariadb-clustercheck-logs source-dir=kolla_logs target-dir=/var/log/kolla/ options=rw
+    --disabled
+  run_once: True
+  when:
+    - mariadb_clustercheck_pcs_resource_existed.rc != 0
+    - enable_mariadb_clustercheck | bool

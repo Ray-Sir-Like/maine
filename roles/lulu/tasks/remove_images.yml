@@ -1,0 +1,9 @@
+---
+- name: Removing lulu images
+  become: true
+  docker_image:
+    name: "{{ item.value.image }}"
+    state: absent
+    force: yes
+  with_dict: "{{ lulu_services }}"
+  tags: lulu

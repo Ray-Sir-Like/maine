@@ -1,0 +1,219 @@
+---
+project_name: "kunkka"
+
+kunkka_services:
+  kunkka:
+    container_name: kunkka
+    group: kunkka
+    enabled: "{{ enable_kunkka | bool }}"
+    image: "{{ kunkka_image_full }}"
+    volumes: "{{ kunkka_default_volumes + kunkka_extra_volumes }}"
+    dimensions: "{{ kunkka_dimensions }}"
+    healthcheck: "{{ kunkka_healthcheck }}"
+    haproxy:
+      kunkka:
+        enabled: "{{ enable_kunkka }}"
+        mode: "http"
+        external: false
+        port: "{% if kolla_enable_tls_external | bool %}{{ kunkka_tls_port }}{% else %}{{ kunkka_port }}{% endif %}"
+        listen_port: "{{ kunkka_console_port }}"
+        backend_http_extra:
+          - "balance source"
+      kunkka_external:
+        enabled: "{{ enable_kunkka }}"
+        mode: "http"
+        external: true
+        port: "{% if kolla_enable_tls_external | bool %}{{ kunkka_tls_port }}{% else %}{{ kunkka_port }}{% endif %}"
+        listen_port: "{{ kunkka_console_port }}"
+        backend_http_extra:
+          - "balance source"
+      kunkka_external_redirect:
+        enabled: "{{ enable_kunkka | bool and kolla_enable_tls_external | bool }}"
+        mode: "redirect"
+        external: true
+        port: "{{ kunkka_port }}"
+        listen_port: "{{ kunkka_console_port }}"
+  kunkka-admin:
+    container_name: kunkka_admin
+    group: kunkka-admin
+    enabled: "{{ enable_kunkka | bool }}"
+    image: "{{ kunkka_admin_image_full }}"
+    volumes: "{{ kunkka_admin_default_volumes + kunkka_admin_extra_volumes }}"
+    dimensions: "{{ kunkka_admin_dimensions }}"
+    healthcheck: "{{ kunkka_admin_healthcheck }}"
+    haproxy:  # TODO(Xing Zhang): Move to another VIP
+      kunkka_admin:
+        enabled: "{{ enable_kunkka }}"
+        mode: "http"
+        external: false
+        port: "{{ kunkka_admin_port }}"
+        listen_port: "{{ kunkka_admin_port }}"
+        backend_http_extra:
+          - "balance source"
+      kunkka_admin_external:
+        enabled: "{{ enable_kunkka }}"
+        mode: "http"
+        external: true
+        port: "{{ kunkka_admin_port }}"
+        listen_port: "{{ kunkka_admin_port }}"
+        backend_http_extra:
+          - "balance source"
+  kunkka-message:
+    container_name: kunkka_message
+    group: kunkka-message
+    enabled: "{{ enable_kunkka_ws | bool }}"
+    image: "{{ kunkka_message_image_full }}"
+    volumes: "{{ kunkka_message_default_volumes + kunkka_message_extra_volumes }}"
+    dimensions: "{{ kunkka_message_dimensions }}"
+    healthcheck: "{{ kunkka_message_healthcheck }}"
+    haproxy:
+      kunkka_message:
+        enabled: "{{ enable_kunkka_ws }}"
+        mode: "http"
+        external: false
+        port: "{{ kunkka_message_port }}"
+        listen_port: "{{ kunkka_message_port }}"
+
+####################
+# Kunkka
+####################
+kunkka_logging_debug: False
+kunkka_log_dir: /var/log/kolla/kunkka
+
+kunkka_rabbitmq_heartbeat: 60
+kunkka_rabbitmq_source_exchanges: "{{ notification_control_exchanges | default(['openstack']) }}"
+kunkka_rabbitmq_reconnect_timeout: 1000
+kunkka_rabbitmq_max_timeout_limit: 120000
+
+sso_providers: []
+
+kunkka_urls:
+  undercloud_prometheus:
+    url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ hawkeye_prometheus_port }}"
+    username: "{{ prometheus_user }}"
+    password: "{{ prometheus_password }}"
+  overcloud_prometheus:
+    url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ prometheus_port }}"
+    username: "{{ prometheus_user }}"
+    password: "{{ prometheus_password }}"
+  undercloud_grafana:
+    url: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ hawkeye_grafana_port }}"
+    username: "{{ grafana_admin_username }}"
+    password: "{{ grafana_admin_password }}"
+  captain: "http://{{ 'bifrost_network' | kolla_address(groups['deployment'][0]) | put_address_in_context('url') }}:{{ captain_port }}"
+  admin_guide_doc: "http://{{ kolla_external_fqdn | put_address_in_context('url') }}:5800/admin"
+  user_guide_doc: "http://{{ kolla_external_fqdn | put_address_in_context('url') }}:5800/user"
+
+kunkka_session_max_age: 86400000
+kunkka_session_renew: "no"
+
+####################
+# Docker
+####################
+kunkka_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/kunkka"
+kunkka_tag: "{{ openstack_tag }}"
+kunkka_image_full: "{{ kunkka_image }}:{{ kunkka_tag }}"
+
+kunkka_admin_image: "{{ kunkka_image }}"
+kunkka_admin_tag: "{{ kunkka_tag }}"
+kunkka_admin_image_full: "{{ kunkka_admin_image }}:{{ kunkka_admin_tag }}"
+
+kunkka_message_image: "{{ kunkka_image }}"
+kunkka_message_tag: "{{ kunkka_tag }}"
+kunkka_message_image_full: "{{ kunkka_message_image }}:{{ kunkka_message_tag }}"
+
+kunkka_dimensions: "{{ default_container_dimensions }}"
+kunkka_admin_dimensions: "{{ default_container_dimensions }}"
+kunkka_message_dimensions: "{{ default_container_dimensions }}"
+
+kunkka_default_volumes:
+  - "{{ node_config_directory }}/kunkka/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+kunkka_admin_default_volumes:
+  - "{{ node_config_directory }}/kunkka-admin/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+kunkka_message_default_volumes:
+  - "{{ node_config_directory }}/kunkka-message/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+kunkka_extra_volumes: "{{ default_extra_volumes }}"
+kunkka_admin_extra_volumes: "{{ kunkka_extra_volumes }}"
+kunkka_message_extra_volumes: "{{ default_extra_volumes }}"
+
+kunkka_enable_healthchecks: "{{ enable_container_healthchecks }}"
+kunkka_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+kunkka_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+kunkka_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+kunkka_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address | put_address_in_context('url') }}:{{ kunkka_console_port }}/healthcheck"]
+kunkka_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+kunkka_healthcheck:
+  interval: "{{ kunkka_healthcheck_interval }}"
+  retries: "{{ kunkka_healthcheck_retries }}"
+  start_period: "{{ kunkka_healthcheck_start_period }}"
+  test: "{% if kunkka_enable_healthchecks | bool %}{{ kunkka_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ kunkka_healthcheck_timeout }}"
+
+kunkka_admin_enable_healthchecks: "{{ enable_container_healthchecks }}"
+kunkka_admin_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+kunkka_admin_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+kunkka_admin_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+kunkka_admin_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address | put_address_in_context('url') }}:{{ kunkka_admin_port }}/healthcheck"]
+kunkka_admin_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+kunkka_admin_healthcheck:
+  interval: "{{ kunkka_admin_healthcheck_interval }}"
+  retries: "{{ kunkka_admin_healthcheck_retries }}"
+  start_period: "{{ kunkka_admin_healthcheck_start_period }}"
+  test: "{% if kunkka_admin_enable_healthchecks | bool %}{{ kunkka_admin_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ kunkka_admin_healthcheck_timeout }}"
+
+kunkka_message_enable_healthchecks: "{{ enable_container_healthchecks }}"
+kunkka_message_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+kunkka_message_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+kunkka_message_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+kunkka_message_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address | put_address_in_context('url') }}:{{ kunkka_message_port }}/healthcheck"]
+kunkka_message_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+kunkka_message_healthcheck:
+  interval: "{{ kunkka_message_healthcheck_interval }}"
+  retries: "{{ kunkka_message_healthcheck_retries }}"
+  start_period: "{{ kunkka_message_healthcheck_start_period }}"
+  test: "{% if kunkka_message_enable_healthchecks | bool %}{{ kunkka_message_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ kunkka_message_healthcheck_timeout }}"
+
+####################
+# Firewall
+####################
+kunkka_firewall_zone: "{{ firewall_zone }}"
+
+####################
+# OpenStack
+####################
+kunkka_keystone_user: "kunkka"
+
+kunkka_message_admin_endpoint: "ws://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ kunkka_message_port }}"
+kunkka_message_internal_endpoint: "ws://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ kunkka_message_port }}"
+
+# valid options are ['internal', 'public']
+kunkka_keystone_endpoint_type: "internal"
+kunkka_keystone_url: "{% if kunkka_keystone_endpoint_type == 'internal' %}{{ keystone_internal_url }}{% else %}{{ keystone_public_url }}{% endif %}"
+
+openstack_kunkka_auth: "{{ openstack_auth }}"
+
+####################
+# Keystone
+####################
+kunkka_ks_users:
+  - project: "service"
+    user: "{{ kunkka_keystone_user }}"
+    password: "{{ kunkka_keystone_password }}"
+    role: "admin"
+
+kunkka_ws_services:
+  - name: "kunkka-ws"
+    type: "kunkka-ws"
+    description: "Kunkka Dashboard WebSocket Message"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ kunkka_message_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ kunkka_message_internal_endpoint }}'}

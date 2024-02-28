@@ -1,0 +1,82 @@
+[DEFAULT]
+debug = {{ swallow_logging_debug }}
+
+log_dir = /var/log/kolla/swallow
+
+{% if service_name == 'swallow-api' %}
+# Force swallow-api.log or will use app.wsgi
+log_file = /var/log/kolla/swallow/swallow-api.log
+{% endif %}
+
+transport_url = {{ rpc_transport_url }}
+
+[database]
+connection = mysql+pymysql://{{ swallow_database_user }}:{{ swallow_database_password }}@{{ swallow_database_address }}/{{ swallow_database_name }}
+max_retries = -1
+
+[index]
+connection = mysql+pymysql://{{ swallow_index_database_user }}:{{ swallow_index_database_password }}@{{ swallow_index_database_address }}/{{ swallow_index_database_name }}
+max_retries = -1
+
+[encryption]
+encryption_key = {{ swallow_crypto_key }}
+
+[keystone_authtoken]
+www_authenticate_uri = {{ keystone_internal_url }}
+auth_url = {{ keystone_admin_url }}
+auth_type = password
+project_domain_id = {{ default_project_domain_id }}
+user_domain_id = {{ default_user_domain_id }}
+project_name = service
+username = {{ swallow_keystone_user }}
+password = {{ swallow_keystone_password }}
+region_name = {{ openstack_region_name }}
+cafile = {{ openstack_cacert }}
+memcache_security_strategy = ENCRYPT
+memcache_secret_key = {{ memcache_secret_key }}
+memcached_servers = {% for host in groups['memcached'] %}{{ 'api' | kolla_address(host) | put_address_in_context('memcache') }}:{{ memcached_port }}{% if not loop.last %},{% endif %}{% endfor %}
+
+[oslo_concurrency]
+lock_path = /var/lib/swallow/tmp
+
+{% if swallow_policy_file is defined %}
+[oslo_policy]
+policy_file = {{ swallow_policy_file }}
+{% endif %}
+
+[api]
+host_ip = {{ api_interface_address }}
+port = {{ swallow_api_port }}
+
+[task_engine]
+max_workers = {{ openstack_service_workers }}
+
+[policy_engine]
+max_workers = {{ openstack_service_workers }}
+
+[coordination]
+{% if enable_redis | bool %}
+backend_url = {{ redis_connection_string }}
+{% endif %}
+
+[oslo_messaging_notifications]
+transport_url = {{ notify_transport_url }}
+{% if swallow_enabled_notification_topics %}
+driver = messagingv2
+topics = {{ swallow_enabled_notification_topics | map(attribute='name') | join(',') }}
+{% else %}
+driver = noop
+{% endif %}
+
+[oslo_messaging_rabbit]
+heartbeat_in_pthread = {{ service_name == 'swallow-api' }}
+{% if om_enable_rabbitmq_tls | bool %}
+ssl = true
+ssl_ca_file = {{ om_rabbitmq_cacert }}
+{% endif %}
+{% if om_enable_rabbitmq_high_availability | bool %}
+amqp_durable_queues = true
+{% endif %}
+
+[nuntius]
+nuntius_notify_url = http://{{ api_interface_address }}:{{ nuntius_port }}/notify

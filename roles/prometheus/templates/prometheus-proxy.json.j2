@@ -1,0 +1,26 @@
+{% set prometheus_proxy_cmd = 'apache2' if kolla_base_distro in ['ubuntu', 'debian'] else 'httpd' %}
+{% set prometheus_proxy_dir = 'apache2/conf-enabled' if kolla_base_distro in ['ubuntu', 'debian'] else 'httpd/conf.d' %}
+{
+    "command": "{{ prometheus_proxy_cmd }} -DFOREGROUND",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/prometheus_proxy.conf",
+            "dest": "/etc/unitedstack_prometheus_proxy/unitedstack_prometheus_proxy.conf",
+            "owner": "prometheus",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/wsgi-prometheus-proxy.conf",
+            "dest": "/etc/{{ prometheus_proxy_dir }}/wsgi-prometheus-proxy.conf",
+            "owner": "prometheus",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+       {
+            "path": "/var/log/kolla/prometheus",
+            "owner": "prometheus:prometheus",
+            "recurse": true
+       }
+    ]
+}

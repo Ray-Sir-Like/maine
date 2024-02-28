@@ -1,0 +1,13 @@
+---
+- include_role:
+    name: mariadb
+    tasks_from: check
+  vars:
+    mariadb_service:
+      container_name: "hacluster_pacemaker"
+
+- name: Waits for all nodes in mariadb cluster up
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ mariadb_port }}"
+    delay: 10

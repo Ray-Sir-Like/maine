@@ -1,0 +1,30 @@
+{
+    "command": "zaqar-server",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/zaqar.conf",
+            "dest": "/etc/zaqar/zaqar.conf",
+            "owner": "zaqar",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/ustack_sendmail",
+            "dest": "{{ zaqar_smtp_command }}",
+            "owner": "zaqar",
+            "perm": "0755"
+        }{% if zaqar_policy_file is defined %},
+        {
+            "source": "{{ container_config_directory }}/{{ zaqar_policy_file }}",
+            "dest": "/etc/zaqar/{{ zaqar_policy_file }}",
+            "owner": "zaqar",
+            "perm": "0600"
+        }{% endif %}
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/zaqar",
+            "owner": "zaqar:zaqar",
+            "recurse": true
+        }
+    ]
+}

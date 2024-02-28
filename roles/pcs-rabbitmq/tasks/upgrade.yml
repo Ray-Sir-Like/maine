@@ -1,0 +1,8 @@
+---
+- name: Set rabbitmq pcs resource force updated
+  set_fact:
+    rabbitmq_force_update: 'yes'
+
+- import_tasks: config.yml
+
+- import_tasks: check-containers.yml

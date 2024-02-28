@@ -1,0 +1,61 @@
+---
+project_name: "pdns"
+
+pdns_services:
+  pdns:
+    container_name: designate_backend_pdns4
+    group: designate-backend-pdns4
+    enabled: true
+    image: "{{ pdns_image_full }}"
+    volumes: "{{ pdns_default_volumes + pdns_extra_volumes }}"
+    dimensions: "{{ pdns_dimensions }}"
+    healthcheck: "{{ pdns_healthcheck }}"
+    haproxy:
+      pdns:
+        enabled: "{{ enable_pdns }}"
+        mode: "http"
+        external: false
+        port: "{{ pdns_webserver_port }}"
+      pdns_external:
+        enabled: "{{ enable_pdns | bool and enable_external_pdns_webconsole | bool }}"
+        mode: "http"
+        external: true
+        port: "{{ pdns_webserver_port }}"
+
+
+####################
+# Database
+####################
+pdns_database_name: "pdns"
+pdns_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}pdns{% endif %}"
+pdns_database_address: "{{ database_address }}"
+pdns_database_port: "{{ database_port }}"
+
+####################
+# Docker
+####################
+pdns_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-backend-pdns4"
+pdns_tag: "{{ openstack_tag }}"
+pdns_image_full: "{{ pdns_image }}:{{ pdns_tag }}"
+
+pdns_dimensions: "{{ default_container_dimensions }}"
+
+pdns_enable_healthchecks: "{{ enable_container_healthchecks }}"
+pdns_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+pdns_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+pdns_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+pdns_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ pdns_webserver_port }}"]
+pdns_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+pdns_healthcheck:
+  interval: "{{ pdns_healthcheck_interval }}"
+  retries: "{{ pdns_healthcheck_retries }}"
+  start_period: "{{ pdns_healthcheck_start_period }}"
+  test: "{% if pdns_enable_healthchecks | bool %}{{ pdns_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ pdns_healthcheck_timeout }}"
+
+pdns_default_volumes:
+  - "{{ node_config_directory }}/pdns/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+pdns_extra_volumes: "{{ default_extra_volumes }}"

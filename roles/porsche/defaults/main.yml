@@ -1,0 +1,141 @@
+---
+project_name: "porsche"
+
+porsche_services:
+  porsche-api:
+    container_name: porsche_api
+    group: porsche-api
+    enabled: true
+    image: "{{ porsche_api_image_full }}"
+    volumes: "{{ porsche_api_default_volumes + porsche_api_extra_volumes }}"
+    dimensions: "{{ porsche_api_dimensions }}"
+    healthcheck: "{{ porsche_api_healthcheck }}"
+    haproxy:
+      porsche_api:
+        enabled: "{{ enable_porsche }}"
+        mode: "http"
+        external: false
+        port: "{{ porsche_api_port }}"
+      porsche_api_external:
+        enabled: "{{ enable_porsche }}"
+        mode: "http"
+        external: true
+        port: "{{ porsche_api_port }}"
+  porsche-processor:
+    container_name: porsche_processor
+    group: porsche-processor
+    enabled: true
+    image: "{{ porsche_processor_image_full }}"
+    privileged: True
+    volumes: "{{ porsche_processor_default_volumes + porsche_processor_extra_volumes }}"
+    dimensions: "{{ porsche_processor_dimensions }}"
+    healthcheck: "{{ porsche_processor_healthcheck }}"
+
+####################
+## Database
+####################
+porsche_database_name: "porsche"
+porsche_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}porsche{% endif %}"
+porsche_database_address: "{{ database_address }}:{{ database_port }}"
+
+
+####################
+## Docker
+####################
+porsche_install_type: "{{ kolla_install_type }}"
+porsche_tag: "{{ openstack_tag }}"
+
+porsche_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/porsche-api"
+porsche_api_tag: "{{ porsche_tag }}"
+porsche_api_image_full: "{{ porsche_api_image }}:{{ porsche_api_tag }}"
+
+porsche_processor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/porsche-processor"
+porsche_processor_tag: "{{ porsche_tag }}"
+porsche_processor_image_full: "{{ porsche_processor_image }}:{{ porsche_processor_tag }}"
+
+porsche_api_dimensions: "{{ default_container_dimensions }}"
+porsche_processor_dimensions: "{{ default_container_dimensions }}"
+
+porsche_api_enable_healthchecks: "{{ enable_container_healthchecks }}"
+porsche_api_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+porsche_api_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+porsche_api_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+porsche_api_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ porsche_api_port }} "]
+porsche_api_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+porsche_api_healthcheck:
+  interval: "{{ porsche_api_healthcheck_interval }}"
+  retries: "{{ porsche_api_healthcheck_retries }}"
+  start_period: "{{ porsche_api_healthcheck_start_period }}"
+  test: "{% if porsche_api_enable_healthchecks | bool %}{{ porsche_api_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ porsche_api_healthcheck_timeout }}"
+
+porsche_processor_enable_healthchecks: "{{ enable_container_healthchecks }}"
+porsche_processor_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+porsche_processor_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+porsche_processor_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+porsche_processor_healthcheck_test: ["CMD-SHELL", "healthcheck_port porsche-processor {{ om_rpc_port }}"]
+porsche_processor_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+porsche_processor_healthcheck:
+  interval: "{{ porsche_processor_healthcheck_interval }}"
+  retries: "{{ porsche_processor_healthcheck_retries }}"
+  start_period: "{{ porsche_processor_healthcheck_start_period }}"
+  test: "{% if porsche_processor_enable_healthchecks | bool %}{{ porsche_processor_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ porsche_processor_healthcheck_timeout }}"
+
+porsche_api_default_volumes:
+  - "{{ node_config_directory }}/porsche-api/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "{{ kolla_dev_repos_directory ~ '/porsche/porsche:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/porsche' if porsche_dev_mode | bool else '' }}"
+  - "kolla_logs:/var/log/kolla/"
+porsche_processor_default_volumes:
+  - "{{ node_config_directory }}/porsche-processor/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "{{ kolla_dev_repos_directory ~ '/porsche/porsche:/var/lib/kolla/venv/lib/python' ~ distro_python_version ~ '/site-packages/porsche' if porsche_dev_mode | bool else '' }}"
+  - "/run:/run:shared"
+  - "/usr/lib/docker:/usr/lib/docker"
+  - "/var/lib/docker:/var/lib/docker"
+
+porsche_extra_volumes: "{{ default_extra_volumes }}"
+porsche_api_extra_volumes: "{{ porsche_extra_volumes }}"
+porsche_processor_extra_volumes: "{{ porsche_extra_volumes }}"
+
+####################
+## OpenStack
+####################
+porsche_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ porsche_api_port }}"
+porsche_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ porsche_api_port }}"
+porsche_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ porsche_api_port }}"
+
+porsche_logging_debug: "{{ openstack_logging_debug }}"
+
+porsche_keystone_user: "porsche"
+
+openstack_porsche_auth: "{{ openstack_auth }}"
+
+
+####################
+# Kolla
+####################
+porsche_git_repository: "{{ kolla_dev_repos_git }}/{{ project_name }}"
+porsche_dev_repos_pull: "{{ kolla_dev_repos_pull }}"
+porsche_dev_mode: "{{ kolla_dev_mode }}"
+porsche_source_version: "{{ kolla_source_version }}"
+
+####################
+# Keystone
+####################
+porsche_ks_services:
+  - name: "porsche"
+    type: "resource"
+    description: "Resource Manager"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ porsche_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ porsche_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ porsche_public_endpoint }}'}
+
+porsche_ks_users:
+  - project: "service"
+    user: "{{ porsche_keystone_user }}"
+    password: "{{ porsche_keystone_password }}"
+    role: "admin"

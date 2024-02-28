@@ -1,0 +1,388 @@
+global:
+  scrape_interval: {{ prometheus_scrape_interval }}
+  scrape_timeout: {{ prometheus_scrape_timeout }}
+  evaluation_interval: {{ prometheus_evaluation_interval }}
+  external_labels:
+    region: "{{ hawkeye_region_name }}"
+
+{% if enable_hawkeye_alertmanager | bool %}
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets:
+{% for host in groups['hawkeye_alertmanager'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_alertmanager_port }}'
+{% endfor %}
+{% endif %}
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+# cadvisor
+{% if enable_hawkeye_cadvisor | bool %}
+  - job_name: 'cadvisor'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_cadvisor'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_cadvisor_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# prometheus
+{% if enable_hawkeye_prometheus | bool %}
+  - job_name: 'prometheus'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_prometheus'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_prometheus_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# haproxy
+{% if enable_hawkeye_haproxy_exporter | bool %}
+  - job_name: 'haproxy_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_haproxy_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_haproxy_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# keepalived
+{% if enable_hawkeye_keepalived_exporter | bool %}
+  - job_name: 'keepalived_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_keepalived_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_keepalived_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# memcached
+{% if enable_hawkeye_memcached_exporter | bool %}
+  - job_name: 'memcached_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_memcached_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_memcached_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# mysql
+{% if enable_hawkeye_mysqld_exporter | bool %}
+  - job_name: 'mysqld_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_mysqld_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_mysqld_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# baremetal node
+{% if enable_hawkeye_node_exporter | bool %}
+  - job_name: 'node_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_node_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_node_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# smartctl
+{% if enable_hawkeye_smartctl_exporter | bool %}
+  - job_name: "smartctl_exporter"
+{% if kolla_enable_tls_internal | bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_smartctl_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_smartctl_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# docker container state
+{% if enable_hawkeye_docker_state_exporter | bool %}
+  - job_name: 'docker_state_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_docker_state_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_docker_state_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# redis
+{% if enable_hawkeye_redis_exporter | bool %}
+  - job_name: 'redis_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% for host in groups['hawkeye_redis_exporter'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_redis_exporter_port }}'
+{% endfor %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# openstack
+{% if enable_hawkeye_openstack_exporter | bool %}
+  - job_name: 'openstack_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: "https"
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    scrape_interval: 5m
+    scrape_timeout: 5m
+    static_configs:
+      - targets:
+        - '{{ kolla_internal_vip_address }}:{{ hawkeye_openstack_exporter_port }}'
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# rabbitmq
+{% if enable_hawkeye_rabbitmq_exporter | bool %}
+  - job_name: 'rabbitmq_exporter'
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    static_configs:
+      - targets:
+{% for host in groups['rabbitmq'] %}
+        - '{{ 'monitoring' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_rabbitmq_exporter_port }}'
+{% endfor %}
+{% if kolla_enable_tls_internal|bool %}
+        scheme: 'https'
+        tls_config:
+          insecure_skip_verify: true
+{% endif %}
+    relabel_configs:
+        - source_labels: [__address__]
+          regex: '([^:]+):\d+'
+          target_label: instance
+{% endif %}
+
+# ceph
+# Note(Yao Ning): suppose mgr default on control nodes
+  - job_name: 'ceph_exporter'
+{% if kolla_enable_tls_internal|bool %}
+    scheme: 'https'
+    tls_config:
+      insecure_skip_verify: true
+{% endif %}
+    static_configs:
+      - targets:
+{% if hawkeye_ceph_exporter_addresses | length > 0 %}
+{% for address in hawkeye_ceph_exporter_addresses %}
+        - '{{ address }}:{{ hawkeye_ceph_exporter_port }}'
+{% endfor %}
+{% else %}
+{% for host in groups['control'] %}
+        - '{{ 'storage' | kolla_address(host) | put_address_in_context('url') }}:{{ hawkeye_ceph_exporter_port }}'
+{% endfor %}
+{% endif %}
+
+# blackbox
+{% if enable_hawkeye_blackbox_exporter | bool %}
+  - job_name: "ping_network_interface"
+    params:
+      module:
+        - icmp
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+{% for host in groups['baremetal'] %}
+{% if hostvars[host]['ansible_' + network_interface] is defined %}
+        - '{{ 'network' | kolla_address(host) }}'
+{% endif %}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        regex: '([^:]+):\d+'
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ kolla_internal_vip_address }}:{{ hawkeye_blackbox_exporter_port }}"
+
+  - job_name: "ping_api_interface"
+    params:
+      module:
+        - icmp
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+{% for host in groups['baremetal'] %}
+{% if hostvars[host]['ansible_' + api_interface] is defined %}
+        - '{{ 'api' | kolla_address(host) }}'
+{% endif %}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        regex: '([^:]+):\d+'
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ kolla_internal_vip_address }}:{{ hawkeye_blackbox_exporter_port }}"
+
+  - job_name: "ping_storage_interface"
+    params:
+      module:
+        - icmp
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+{% for host in groups['baremetal'] %}
+{% if hostvars[host]['ansible_' + storage_interface] is defined %}
+        - '{{ 'storage' | kolla_address(host) }}'
+{% endif %}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        regex: '([^:]+):\d+'
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ kolla_internal_vip_address }}:{{ hawkeye_blackbox_exporter_port }}"
+
+  - job_name: "ping_storage_mgmt_interface"
+    params:
+      module:
+        - icmp
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+{% for host in groups['baremetal'] %}
+{% if hostvars[host]['ansible_' + storage_mgmt_interface] is defined %}
+        - '{{ 'storage_mgmt' | kolla_address(host) }}'
+{% endif %}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        regex: '([^:]+):\d+'
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ kolla_internal_vip_address }}:{{ hawkeye_blackbox_exporter_port }}"
+
+  - job_name: "ping_tunnel_interface"
+    params:
+      module:
+        - icmp
+    scrape_interval: 15s
+    scrape_timeout: 15s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+{% for host in groups['baremetal'] %}
+{% if hostvars[host]['ansible_' + tunnel_interface] is defined %}
+        - '{{ 'tunnel' | kolla_address(host) }}'
+{% endif %}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        regex: '([^:]+):\d+'
+        target_label: instance
+      - target_label: __address__
+        replacement: "{{ kolla_internal_vip_address }}:{{ hawkeye_blackbox_exporter_port }}"
+{% endif %}

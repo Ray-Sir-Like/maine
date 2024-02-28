@@ -1,0 +1,98 @@
+---
+- name: Ensuring config directories exist
+  file:
+    path: "{{ node_config_directory }}/{{ item }}"
+    state: "directory"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0770"
+  become: true
+  with_items:
+    - "bifrost"
+    - "bifrost/pxe"
+
+- name: Generate bifrost configs
+  merge_yaml:
+    sources:
+      - "{{ role_path }}/templates/{{ item }}.yml.j2"
+      - "{{ node_custom_config }}/{{ item }}.yml"
+      - "{{ node_custom_config }}/bifrost/{{ item }}.yml"
+    dest: "{{ node_config_directory }}/bifrost/{{ item }}.yml"
+    mode: "0660"
+  become: true
+  with_items:
+    - "bifrost"
+
+- name: Generate bifrost node list
+  copy:
+    src: "{{ node_custom_config }}/bifrost/servers.csv"
+    dest: "{{ node_config_directory }}/bifrost/servers.csv"
+    mode: "0660"
+  become: true
+
+- name: Copy status_checker.py
+  copy:
+    src: status_checker.py
+    dest: "{{ node_config_directory }}/bifrost/status_checker.py"
+    mode: "0755"
+  become: true
+
+- name: Copy discovery_rules.json
+  template:
+    src: discovery_rules.json.j2
+    dest: "{{ node_config_directory }}/bifrost/discovery_rules.json"
+    mode: "0644"
+  become: true
+
+- name: Determine if seed is missing an SSH key
+  stat: path={{ ssh_public_key_dir }}/id_rsa
+  register: bifrost_ssh_public_key_path
+
+- name: Create an SSH key for the seed
+  shell: ssh-keygen -f {{ ssh_public_key_dir }}/id_rsa -N ""
+  when: >
+    bifrost_ssh_public_key_path.stat.exists |bool  == false
+
+- name: Update SSH pubkey for the seed
+  shell: ssh-keygen -y -f {{ ssh_public_key_dir }}/id_rsa > {{ ssh_public_key_dir }}/id_rsa.pub
+
+- name: Set authorized_keys for seed
+  shell: cat {{ ssh_public_key_dir }}/id_rsa.pub > {{ ssh_public_key_dir }}/authorized_keys
+
+- name: Copy ssh_config File
+  copy:
+    src: "ssh_config"
+    dest: "{{ ssh_public_key_dir }}/ssh_config"
+    mode: "0600"
+  become: true
+
+- name: Copy ssh keys to bifrost
+  copy:
+    src: "{{ ssh_public_key_dir }}/{{ item.src }}"
+    dest: "{{ node_config_directory }}/bifrost/{{ item.dest }}"
+    mode: "0600"
+  become: true
+  with_items:
+    - { src: "id_rsa", dest: "id_rsa" }
+    - { src: "id_rsa.pub", dest: "id_rsa.pub" }
+    - { src: "ssh_config", dest: "ssh_config" }
+
+- name: Copy pxe config files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ node_config_directory }}/bifrost/pxe/{{ item }}"
+    mode: "0644"
+  with_items: "{{ pxe_related_files }}"
+
+- name: Copy pxe config templates
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ node_config_directory }}/bifrost/pxe/{{ item }}"
+    mode: "0644"
+  with_items: "{{ pxe_related_template_files }}"
+
+- name: Copy pxelinux.cfg.default
+  template:
+    src: "pxelinux.cfg.default.j2"
+    dest: "{{ node_config_directory }}/bifrost/pxelinux.cfg.default"
+    mode: "0644"

@@ -1,0 +1,71 @@
+{% set pxe_dir = ('/tftpboot/grub' if kolla_base_distro in ['ubuntu', 'debian'] else '/tftpboot') if enable_ironic_pxe_uefi | bool else '/tftpboot/pxelinux.cfg' %}
+{% set pxe_cfg = 'grub.cfg' if enable_ironic_pxe_uefi | bool else 'default' %}
+
+{
+    "command": "/usr/sbin/in.tftpd --verbose --foreground --user root --address 0.0.0.0:69 --map-file /map-file /tftpboot",
+    "config_files": [
+{% if not enable_ironic_ipxe | bool and groups['ironic-inspector'] | length > 0 %}
+        {
+            "source": "{{ container_config_directory }}/ipa.kernel",
+            "dest": "/tftpboot/ipa.kernel",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/ipa.initramfs",
+            "dest": "/tftpboot/ipa.initramfs",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/ipa-aarch64.kernel",
+            "dest": "/tftpboot/ipa-aarch64.kernel",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/ipa-aarch64.initramfs",
+            "dest": "/tftpboot/ipa-aarch64.initramfs",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/grub-x86_64.cfg",
+            "dest": "/tftpboot/grub-x86_64.cfg",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/grub-arm64.cfg",
+            "dest": "/tftpboot/grub-arm64.cfg",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/grubaa64.efi",
+            "dest": "/tftpboot/grubaa64.efi",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/grubx64.efi",
+            "dest": "/tftpboot/grubx64.efi",
+            "owner": "root",
+            "perm": "0644"
+        },
+        {
+            "source": "{{ container_config_directory }}/default",
+            "dest": "{{ pxe_dir }}/{{ pxe_cfg }}",
+            "owner": "root",
+            "perm": "0644"
+        }
+{% endif %}
+    ],
+    "permissions": [
+        {
+            "path": "{{ pxe_dir }}",
+            "owner": "ironic:ironic",
+            "recurse": true
+        }
+    ]
+}

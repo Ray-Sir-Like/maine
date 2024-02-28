@@ -1,0 +1,15 @@
+[DEFAULT]
+debug = {{ furion_logging_debug }}
+log_dir = /var/log/furion
+http_addr = {{ api_interface_address }}:{{ furion_server_port }}
+rpc_addr = {{ api_interface_address }}:{{ furion_server_rpc_port }}
+
+[database]
+url = mysql://{{ furion_database_user }}:{{ furion_database_password }}@{{ furion_database_address }}/{{ furion_database_name }}
+
+[openstack]
+rc_path = /root/admin-openrc
+
+[prometheus]
+undercloud_url = {{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ hawkeye_prometheus_port }}
+overcloud_url = {{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ prometheus_port }}

@@ -1,0 +1,11 @@
+{
+    "command": "pdns_server --guardian=no --daemon=no --disable-syslog=no --write-pid=no",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/pdns.conf",
+            "dest": "/etc/pdns/pdns.conf",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ]
+}

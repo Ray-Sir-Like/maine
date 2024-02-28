@@ -1,0 +1,34 @@
+---
+####################
+# Docker
+####################
+bifrost_install_type: "{{ kolla_install_type }}"
+bifrost_tag: "{{ openstack_tag }}"
+
+bifrost_deploy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/bifrost-deploy"
+bifrost_deploy_tag: "{{ bifrost_tag }}"
+bifrost_deploy_image_full: "{{ bifrost_deploy_image }}:{{ bifrost_deploy_tag }}"
+
+ipa_default_kernel_name: "ipa.kernel"
+ipa_default_initramfs_name: "ipa.initramfs"
+ipa_aarch64_default_kernel_name: "ipa-aarch64.kernel"
+ipa_aarch64_default_initramfs_name: "ipa-aarch64.initramfs"
+ironic_default_user_image_name: "ironic-baremetal.qcow2"
+ironic_aarch64_default_user_image_name: "ironic-baremetal-aarch64.qcow2"
+
+enable_inspector_discovery: "{{ 'True' if ipmi_username is defined and ipmi_password is defined else 'False' }}"
+
+file_url_port: 7870
+file_url_port_tls: 7873
+
+user: root
+
+ssh_public_key_dir: "{{ lookup('env', 'HOME') }}/.ssh"
+
+pxe_related_files:
+  - grub.cfg
+  - pxe_grubaa64_config.template
+
+pxe_related_template_files:
+  - grub-arm64.cfg
+  - grub-x86_64.cfg

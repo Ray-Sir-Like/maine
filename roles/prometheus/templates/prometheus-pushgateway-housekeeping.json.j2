@@ -1,0 +1,5 @@
+{
+    "command": "/opt/pushgateway-housekeeping/pushgateway-housekeeping -log.level {{ prometheus_pushgateway_housekeeping_log_level }} -period {{ prometheus_pushgateway_housekeeping_period }} -pushgateway.retention.time {{ prometheus_pushgateway_housekeeping_retention_time }} -pushgateway.url {{ internal_protocol }}://{{ api_interface_address }}:{{ prometheus_pushgateway_port }}",
+    "config_files": [],
+    "permissions": []
+}

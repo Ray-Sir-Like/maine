@@ -1,0 +1,16 @@
+---
+- include_role:
+    name: mariadb
+    tasks_from: config
+  vars:
+    kolla_action: "config"
+
+- name: Replace mariadb executable to pacemaker remote
+  vars:
+    service_name: "mariadb"
+  replace:
+    path: "{{ node_config_directory }}/{{ service_name }}/config.json"
+    regexp: "bin/mysqld_safe"
+    replace: "sbin/pacemaker-remoted -l /var/log/kolla/mariadb/pacemaker-remote.log"
+
+- import_tasks: config-pacemaker-resource.yml

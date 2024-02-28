@@ -1,0 +1,36 @@
+---
+- name: Creating kunkka databases
+  kolla_toolbox:
+    module_name: mysql_db
+    module_args:
+      login_host: "{{ kunkka_database_address }}"
+      login_port: "{{ kunkka_database_port }}"
+      login_user: "{{ kunkka_database_admin_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ kunkka_database_name }}"
+  register: database
+  run_once: True
+  delegate_to: "{{ groups['kunkka'][0] }}"
+  when:
+    - not use_preconfigured_databases | bool
+
+- name: Creating kunkka databases user and setting permissions
+  kolla_toolbox:
+    module_name: mysql_user
+    module_args:
+      login_host: "{{ kunkka_database_address }}"
+      login_port: "{{ kunkka_database_port }}"
+      login_user: "{{ kunkka_database_admin_user }}"
+      login_password: "{{ database_password }}"
+      name: "{{ kunkka_database_user }}"
+      password: "{{ kunkka_database_password }}"
+      host: "%"
+      priv: "{{ kunkka_database_name }}.*:ALL"
+      append_privs: "yes"
+  run_once: True
+  delegate_to: "{{ groups['kunkka'][0] }}"
+  when:
+    - database.changed
+    - not use_preconfigured_databases | bool
+
+- import_tasks: bootstrap_service.yml

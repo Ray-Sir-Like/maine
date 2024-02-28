@@ -1,0 +1,57 @@
+---
+version: '2.0'
+
+instance_time_snapshot:
+  type: direct
+  description: |
+      This workflow creates a snapshot of an instance.
+      It does as well a cleanup of the previous created snapshots and can stop the
+      server for consistent snapshots.
+  input:
+    - instance
+    - pattern: "{0}_time_snapshot_{1}"
+    - zaqar_queue_name: ""
+    - send_on_success: false
+    - send_on_error: false
+    - max_snapshots: 5
+    - instance_stop: false
+    - action_region: "RegionOne"
+
+  tasks:
+    instance_snapshot:
+      action: mistral_plugin.instance_snapshots_create
+      input:
+        instance: <% $.instance %>
+        max_snapshots: <% $.max_snapshots %>
+        instance_stop: <% $.instance_stop %>
+        action_region: <% $.action_region %>
+
+      publish:
+        i_snap_id: <% task(instance_snapshot).result %>
+
+      on-success:
+        - success_task: <% $.send_on_success %>
+      on-error:
+        - error_task: <% $.send_on_error %>
+
+    success_task:
+      description: 'Notification: Creating Instance Snapshot Successfully'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Snapshot for instance <% $.instance %> has been created"
+            snapshot_id: <% $.i_snap_id %>
+            status: "successed"
+
+    error_task:
+      description: 'Notification: Creating Instance Snapshot Failed'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Failed to create a snapshot for instance <% $.instance %>"
+            snapshot_id: <% $.i_snap_id %>
+            status: "failed"

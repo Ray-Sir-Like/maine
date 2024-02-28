@@ -1,0 +1,29 @@
+---
+- name: Get container facts
+  kolla_container_facts:
+    name:
+      - opensearch
+  register: container_facts
+
+- name: Checking free port for Opensearch
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ logging_opensearch_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['elasticsearch'] is not defined
+    - container_facts['logging_opensearch'] is not defined
+    - inventory_hostname in groups['logging_opensearch']
+
+- name: Checking free port for opensearch-dashboards Server
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ logging_opensearch_dashboards_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['logging_opensearch_dashboards'] is not defined
+    - inventory_hostname in groups['logging_opensearch_dashboards']

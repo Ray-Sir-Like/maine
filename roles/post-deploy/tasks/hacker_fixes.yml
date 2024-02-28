@@ -1,0 +1,67 @@
+---
+- name: update glance medatarefs
+  command: >
+    {{ docker_cmd }} glance
+    --os-endpoint-type internal
+    --os-auth-url {{ openstack_auth.auth_url }}
+    --os-project-domain-name {{ openstack_auth.domain_name }}
+    --os-project-name admin
+    --os-username admin
+    --os-password {{ keystone_admin_password }}
+    --os-user-domain-name {{ openstack_auth.domain_name }}
+    {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %}
+    md-property-update OS::Compute::VirtCPUTopology {{ item.key }}
+    --name {{ item.value }}
+  become: True
+  run_once: True
+  with_dict: {"cpu_maxsockets": "cpu_max_sockets", "cpu_maxcores": "cpu_max_cores", "cpu_maxthreads": "cpu_max_threads"}
+  register: result
+  failed_when:
+    - result.rc != 0
+    - '"404 Not Found" not in result.stderr'
+  when:
+    - enable_glance | bool
+  tags:
+    - fix
+
+- name: list community images
+  command: >
+    {{ docker_cmd }} openstack
+    --os-interface internal
+    --os-auth-url {{ openstack_auth.auth_url }}
+    --os-identity-api-version 3
+    --os-project-domain-name {{ openstack_auth.domain_name }}
+    --os-tenant-name {{ openstack_auth.project_name }}
+    --os-username {{ openstack_auth.username }}
+    --os-password {{ openstack_auth.password }}
+    --os-user-domain-name {{ openstack_auth.domain_name }}
+    {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %}
+    image list --community -f value -c ID
+  register: glance_commnunity_images
+  become: True
+  run_once: True
+  when:
+    - enable_glance | bool
+  tags:
+    - fix
+
+- name: fix community images to public images
+  command: >
+    {{ docker_cmd }} openstack
+    --os-interface internal
+    --os-auth-url {{ openstack_auth.auth_url }}
+    --os-identity-api-version 3
+    --os-project-domain-name {{ openstack_auth.domain_name }}
+    --os-tenant-name {{ openstack_auth.project_name }}
+    --os-username {{ openstack_auth.username }}
+    --os-password {{ openstack_auth.password }}
+    --os-user-domain-name {{ openstack_auth.domain_name }}
+    {% if kolla_enable_tls_internal|bool %}--os-cacert {{ kolla_admin_openrc_cacert }}{% endif %}
+    image set {{ item }} --public
+  with_items: "{{ glance_commnunity_images.stdout_lines }}"
+  become: True
+  run_once: True
+  when:
+    - enable_glance | bool
+  tags:
+    - fix

@@ -1,0 +1,100 @@
+---
+project_name: "zaqar"
+
+zaqar_services:
+  zaqar:
+    container_name: zaqar
+    group: zaqar
+    enabled: true
+    privileged: True
+    image: "{{ zaqar_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/zaqar/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ zaqar_dimensions }}"
+    healthcheck: "{{ zaqar_healthcheck }}"
+    haproxy:
+      zaqar:
+        enabled: "{{ enable_zaqar }}"
+        mode: "http"
+        external: false
+        port: "{{ zaqar_port }}"
+        listen_port: "{{ zaqar_listen_port }}"
+        backend_http_extra:
+          - "balance source"
+      zaqar_external:
+        enabled: "{{ enable_zaqar }}"
+        mode: "http"
+        external: true
+        port: "{{ zaqar_port }}"
+        listen_port: "{{ zaqar_listen_port }}"
+        backend_http_extra:
+          - "balance source"
+
+####################
+# zaqar
+####################
+zaqar_log_dir: /var/log/kolla/zaqar
+
+####################
+# Docker
+####################
+zaqar_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zaqar-wsgi"
+zaqar_tag: "{{ openstack_tag }}"
+zaqar_image_full: "{{ zaqar_image }}:{{ zaqar_tag }}"
+zaqar_dimensions: "{{ default_container_dimensions }}"
+
+zaqar_enable_healthchecks: "{{ enable_container_healthchecks }}"
+zaqar_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+zaqar_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+zaqar_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+zaqar_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ zaqar_port }} "]
+zaqar_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+zaqar_healthcheck:
+  interval: "{{ zaqar_healthcheck_interval }}"
+  retries: "{{ zaqar_healthcheck_retries }}"
+  start_period: "{{ zaqar_healthcheck_start_period }}"
+  test: "{% if zaqar_enable_healthchecks | bool %}{{ zaqar_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ zaqar_healthcheck_timeout }}"
+
+####################
+# Firewall
+####################
+zaqar_firewall_zone: "{{ firewall_zone }}"
+
+####################
+# OpenStack
+####################
+zaqar_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ zaqar_port }}"
+zaqar_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ zaqar_port }}"
+zaqar_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ zaqar_port }}"
+zaqar_keystone_user: "zaqar"
+zaqar_logging_debug: "{{ openstack_logging_debug }}"
+
+openstack_zaqar_auth: "{{ openstack_auth }}"
+
+zaqar_smtp_command: "/usr/bin/ustack_sendmail"
+zaqar_require_confirmation: True
+
+zaqar_smtp_port: 0
+zaqar_smtp_secure: false
+zaqar_smtp_sender: "noreply@tfcloud.com"
+
+####################
+# Keystone
+####################
+zaqar_ks_services:
+  - name: "zaqar"
+    type: "messaging"
+    description: "Openstack messaging Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ zaqar_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ zaqar_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ zaqar_public_endpoint }}'}
+
+zaqar_ks_users:
+  - project: "service"
+    user: "{{ zaqar_keystone_user }}"
+    password: "{{ zaqar_keystone_password }}"
+    role: "admin"

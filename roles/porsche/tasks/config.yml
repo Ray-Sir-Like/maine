@@ -1,0 +1,104 @@
+---
+- name: Ensuring config directories exist
+  file:
+    path: "{{ node_config_directory }}/{{ item.key }}"
+    state: "directory"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0770"
+  become: true
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ porsche_services }}"
+
+- name: Check if policies shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: porsche_policy
+  with_first_found:
+    - files: "{{ supported_policy_format_list }}"
+      paths:
+        - "{{ node_custom_config }}/porsche/"
+      skip: true
+
+- name: Set porsche policy file
+  set_fact:
+    porsche_policy_file: "{{ porsche_policy.results.0.stat.path | basename }}"
+    porsche_policy_file_path: "{{ porsche_policy.results.0.stat.path }}"
+  when:
+    - porsche_policy.results
+
+- name: Copying over extra CA certificates
+  become: true
+  copy:
+    src: "{{ node_config }}/certificates/ca/"
+    dest: "{{ node_config_directory }}/{{ item.key }}/ca-certificates"
+    mode: "0644"
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+    - kolla_copy_ca_into_containers | bool
+  with_dict: "{{ porsche_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over config.json files for services
+  template:
+    src: "{{ item.key }}.json.j2"
+    dest: "{{ node_config_directory }}/{{ item.key }}/config.json"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ porsche_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- name: Copying over porsche.conf
+  vars:
+    service_name: "{{ item.key }}"
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/porsche.conf.j2"
+      - "{{ node_custom_config }}/global.conf"
+      - "{{ node_custom_config }}/porsche.conf"
+      - "{{ node_custom_config }}/porsche/{{ item.key }}.conf"
+      - "{{ node_custom_config }}/porsche/{{ inventory_hostname }}/porsche.conf"
+    dest: "{{ node_config_directory }}/{{ item.key }}/porsche.conf"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ porsche_services }}"
+  notify:
+    - Restart {{ item.key }} container
+
+- name: Copying over wsgi-porsche files for services
+  vars:
+    service: "{{ porsche_services['porsche-api'] }}"
+  template:
+    src: "wsgi-porsche.conf.j2"
+    dest: "{{ node_config_directory }}/porsche-api/wsgi-porsche.conf"
+    mode: "0660"
+  become: true
+  when:
+    - inventory_hostname in groups[service.group]
+    - service.enabled | bool
+  notify:
+    - Restart porsche-api container
+
+- name: Copying over existing policy file
+  template:
+    src: "{{ porsche_policy_file_path }}"
+    dest: "{{ node_config_directory }}/{{ item.key }}/{{ porsche_policy_file }}"
+    mode: "0660"
+  become: true
+  when:
+    - porsche_policy_file is defined
+    - inventory_hostname in groups[item.value.group]
+  with_dict: "{{ porsche_services }}"
+  notify:
+    - Restart {{ item.key }} container

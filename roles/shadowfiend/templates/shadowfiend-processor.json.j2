@@ -1,0 +1,38 @@
+{
+    "command": "/usr/bin/shadowfiend-processor",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/shadowfiend.conf",
+            "dest": "/etc/shadowfiend/shadowfiend.conf",
+            "owner": "shadowfiend",
+            "perm": "0600"
+        },
+        {
+            "source": "{{ container_config_directory }}/email.j2",
+            "dest": "/etc/shadowfiend/email.j2",
+            "owner": "shadowfiend",
+            "perm": "0600",
+            "optional": true
+        },
+        {
+            "source": "{{ container_config_directory }}/sms.j2",
+            "dest": "/etc/shadowfiend/sms.j2",
+            "owner": "shadowfiend",
+            "perm": "0600",
+            "optional": true
+        }{% if shadowfiend_policy_file is defined %},
+        {
+            "source": "{{ container_config_directory }}/{{ shadowfiend_policy_file }}",
+            "dest": "/etc/cloudkitty/{{ shadowfiend_policy_file }}",
+            "owner": "shadowfiend",
+            "perm": "0600"
+        }{% endif %}
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/shadowfiend",
+            "owner": "shadowfiend:shadowfiend",
+            "recurse": true
+        }
+    ]
+}

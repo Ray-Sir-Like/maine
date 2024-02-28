@@ -1,0 +1,32 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Apply cleanup ceph disks tasks
+  gather_facts: false
+  hosts: osds
+  vars:
+    existed_osds_list: []
+  tasks:
+    - name: ceph pkg version
+      command: "ceph --version"
+      register: result
+
+    - assert:
+        that:
+          - not result.failed
+          - result.stdout.split()[2].split('.')[0] >= 12
+
+    - name: retrive ceph lvm list
+      command: "ceph-volume lvm list --format json"
+      register: existed_osds_dict
+
+    - name: retrive disks already with osds
+      set_fact:
+        existed_osds_list: "{{ (existed_osds_list + item.value[0]['devices'])|unique }}"
+      with_dict: "{{ existed_osds_dict.stdout }}"
+
+    - name: execute ceph-volume to zap disks
+      command: "ceph-volume lvm zap {{ item }} --destroy"
+      with_items: "{{ devices }}"
+      become: True
+      when: item not in existed_osds_list

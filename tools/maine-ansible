@@ -1,0 +1,530 @@
+#!/bin/bash
+#
+# This script can be used to interact with kolla via ansible.
+function check_environment_coherence {
+    local ansible_path
+    ansible_path=$(which ansible)
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR: Ansible is not installed in the current (virtual) environment." >&2
+        exit 1
+    fi
+    local ansible_shebang_line
+    ansible_shebang_line=$(head -n1 "$ansible_path")
+    if ! echo "$ansible_shebang_line" | egrep "^#!" &>/dev/null; then
+        echo "ERROR: Ansible script is malformed (missing shebang line)." >&2
+        exit 1
+    fi
+    local ansible_python_cmdline
+    # NOTE(yoctozepto): may have multiple parts
+    ansible_python_cmdline=${ansible_shebang_line#\#\!}
+    ansible_python_version=$($ansible_python_cmdline -c 'import sys; print(str(sys.version_info[0])+"."+str(sys.version_info[1]))')
+    if ! $ansible_python_cmdline --version &>/dev/null; then
+        echo "ERROR: Ansible Python is not functional." >&2
+        echo "Tried '$ansible_python_cmdline'" >&2
+        exit 1
+    fi
+    # Check for existence of kolla_ansible module using Ansible's Python.
+    if ! $ansible_python_cmdline -c 'import kolla_ansible' &>/dev/null; then
+        echo "ERROR: kolla_ansible has to be available in the Ansible PYTHONPATH." >&2
+        echo "Please install both in the same (virtual) environment." >&2
+        exit 1
+    fi
+    local ansible_version_output
+    ansible_full_version=$($ansible_python_cmdline -c 'import ansible; print(ansible.__version__)')
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR: Failed to obtain Ansible version:" >&2
+        echo "$ansible_full_version" >&2
+        exit 1
+    fi
+    local ansible_version
+    ansible_version=$(echo "$ansible_full_version" | egrep -o '^[0-9]+\.[0-9]+')
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR: Failed to parse Ansible version:" >&2
+        echo "$ansible_full_version" >&2
+        exit 1
+    fi
+    local ANSIBLE_VERSION_MIN=2.6
+    local ANSIBLE_VERSION_MAX=2.9
+    if [[ $(printf "%s\n" "$ANSIBLE_VERSION_MIN" "$ANSIBLE_VERSION_MAX" "$ansible_version" | sort -V | head -n1) != "$ANSIBLE_VERSION_MIN" ]] ||
+       [[ $(printf "%s\n" "$ANSIBLE_VERSION_MIN" "$ANSIBLE_VERSION_MAX" "$ansible_version" | sort -V | tail -n1) != "$ANSIBLE_VERSION_MAX" ]]; then
+        echo "ERROR: Ansible version should be between $ANSIBLE_VERSION_MIN and $ANSIBLE_VERSION_MAX. Current version is $ANSIBLE_VERSION_HOST which is not supported."
+        exit 1
+    fi
+}
+function find_base_dir {
+    local dir_name
+    local python_dir
+    dir_name=$(dirname "$0")
+    # NOTE(yoctozepto): Fix the case where dir_name is a symlink and VIRTUAL_ENV might not be. This
+    # happens with pyenv-virtualenv, see https://bugs.launchpad.net/kolla-ansible/+bug/1903887
+    dir_name=$(readlink -e "$dir_name")
+    python_dir="python${ansible_python_version}"
+    if [ -z "$SNAP" ]; then
+        if [[ ${dir_name} == "/usr/bin" ]]; then
+            if test -f /usr/lib/${python_dir}/*-packages/kolla-ansible.egg-link; then
+                # Editable install.
+                KOLLA_BASEDIR="$(head -n1 /usr/lib/${python_dir}/*-packages/kolla-ansible.egg-link)"
+                MAINE_BASEDIR="$(head -n1 /usr/lib/${python_dir}/*-packages/maine-ansible.egg-link)"
+            else
+                KOLLA_BASEDIR=/usr/share/kolla-ansible
+                MAINE_BASEDIR=/usr/share/maine-ansible
+            fi
+        elif [[ ${dir_name} == "/usr/local/bin" ]]; then
+            if test -f /usr/local/lib/${python_dir}/*-packages/kolla-ansible.egg-link; then
+                # Editable install.
+                KOLLA_BASEDIR="$(head -n1 /usr/local/lib/${python_dir}/*-packages/kolla-ansible.egg-link)"
+                MAINE_BASEDIR="$(head -n1 /usr/local/lib/${python_dir}/*-packages/maine-ansible.egg-link)"
+            else
+                KOLLA_BASEDIR=/usr/local/share/kolla-ansible
+                MAINE_BASEDIR=/usr/local/share/maine-ansible
+            fi
+        elif [[ ${dir_name} == ~/.local/bin ]]; then
+            if test -f ~/.local/lib/${python_dir}/*-packages/kolla-ansible.egg-link; then
+                # Editable install.
+                KOLLA_BASEDIR="$(head -n1 ~/.local/lib/${python_dir}/*-packages/kolla-ansible.egg-link)"
+                MAINE_BASEDIR="$(head -n1 ~/.local/lib/${python_dir}/*-packages/maine-ansible.egg-link)"
+            else
+                KOLLA_BASEDIR=~/.local/share/kolla-ansible
+                MAINE_BASEDIR=~/.local/share/maine-ansible
+            fi
+        elif [[ -n ${VIRTUAL_ENV} ]] && [[ ${dir_name} == "$(readlink -e "${VIRTUAL_ENV}/bin")" ]]; then
+            if test -f ${VIRTUAL_ENV}/lib/${python_dir}/site-packages/kolla-ansible.egg-link; then
+                # Editable install.
+                KOLLA_BASEDIR="$(head -n1 ${VIRTUAL_ENV}/lib/${python_dir}/*-packages/kolla-ansible.egg-link)"
+                MAINE_BASEDIR="$(head -n1 ${VIRTUAL_ENV}/lib/${python_dir}/*-packages/maine-ansible.egg-link)"
+            else
+                KOLLA_BASEDIR="${VIRTUAL_ENV}/share/kolla-ansible"
+                MAINE_BASEDIR="${VIRTUAL_ENV}/share/maine-ansible"
+            fi
+        else
+            KOLLA_BASEDIR="/usr/share/kolla-ansible"
+            MAINE_BASEDIR="$(dirname ${dir_name})"
+        fi
+    else
+        KOLLA_BASEDIR="$SNAP/share/kolla-ansible"
+        MAINE_BASEDIR=/$SNAP/share/maine-ansible
+    fi
+}
+
+function process_cmd {
+    echo "$ACTION : $CMD"
+    $CMD
+    if [[ $? -ne 0 ]]; then
+        echo "Command failed $CMD"
+        exit 1
+    fi
+}
+
+function usage {
+    cat <<EOF
+Usage: $0 COMMAND [options]
+
+Options:
+    --inventory, -i <inventory_path>   Specify path to ansible inventory file
+    --playbook, -p <playbook_path>     Specify path to ansible playbook file
+    --configdir <config_path>          Specify path to directory with globals.yml
+    --key -k <key_path>                Specify path to ansible vault keyfile
+    --help, -h                         Show this usage information
+    --tags, -t <tags>                  Only run plays and tasks tagged with these values
+    --skip-tags <tags>                 Only run plays and tasks whose tags do not match these values
+    --extra, -e <ansible variables>    Set additional variables as key=value or YAML/JSON passed to ansible-playbook
+    --passwords <passwords_path>       Specify path to the passwords file
+    --limit <host>                     Specify host to run plays
+    --forks <forks>                    Number of forks to run Ansible with
+    --vault-id <@prompt or path>       Specify @prompt or password file (Ansible >=  2.4)
+    --ask-vault-pass                   Ask for vault password
+    --vault-password-file <path>       Specify password file for vault decrypt
+    --verbose, -v                      Increase verbosity of ansible-playbook
+
+Commands:
+    genpwds                    Generate kolla and maine passwords
+    prechecks                  Do pre-deployment checks for hosts
+    check                      Do post-deployment smoke tests
+    maine_backup               Take a backup of maine
+    mariadb_recovery           Recover a completely stopped mariadb cluster
+    mariadb_backup             Take a backup of MariaDB databases
+                                   --full (default)
+                                   --incremental
+    cleanup_backup             Clean up maine and mariadb backup
+    bifrost-deploy             Deploying bifrost
+    bifrost-enroll             Enrolling servers with bifrost
+    bifrost-inspect            Inpect and auto enrolling servers with bifrost
+    bifrost-deploy-servers     Deploying servers with bifrost
+    bootstrap-servers          Bootstrap servers with kolla deploy dependencies
+    bootstrap-networks         Bootstrap networks with uos-net-config
+    bootstrap-hosts            Bootstrap hosts file with maine
+    configure-iptables         Configure iptables rules
+    configure-chrony-ha        Configure chrony ha
+    destroy                    Destroy Kolla containers, volumes and host configuration
+                                   --include-images to also destroy Kolla images
+                                   --include-dev to also destroy dev mode repos
+    deploy-ceph                Deploy ceph with ceph-ansible
+    integrate-ceph             Integrate ceph
+    gather-facts               Gather Ansible facts
+    deploy                     Deploy and start all kolla containers
+    post-deploy                Do post deploy on deploy node
+    pull                       Pull all images for containers (only pulls, no running container changes)
+    reconfigure                Reconfigure OpenStack service
+    stop                       Stop Kolla containers
+    certificates               Generate self-signed certificate for TLS *For Development Only*
+    upgrade                    Upgrades existing OpenStack Environment
+    genconfig                  Generate configuration files for enabled OpenStack services
+EOF
+}
+
+function bash_completion {
+cat <<EOF
+--inventory -i
+--playbook -p
+--configdir
+--key -k
+--help -h
+--skip-tags
+--tags -t
+--extra -e
+--passwords
+--limit
+--forks
+--vault-id
+--ask-vault-pass
+--vault-password-file
+--verbose -v
+genpwds
+prechecks
+check
+maine_backup
+mariadb_recovery
+mariadb_backup
+cleanup_backup
+bootstrap-servers
+bootstrap-networks
+bootstrap-hosts
+configure-iptables
+configure-chrony-ha
+destroy
+deploy-ceph
+integrate-ceph
+gather-facts
+deploy
+deploy-bifrost
+deploy-servers
+post-deploy
+pull
+reconfigure
+stop
+certificates
+upgrade
+genconfig
+EOF
+}
+check_environment_coherence
+SHORT_OPTS="hi:p:t:k:e:v"
+LONG_OPTS="help,inventory:,playbook:,skip-tags:,tags:,key:,extra:,verbose,configdir:,passwords:,limit:,forks:,vault-id:,ask-vault-pass,vault-password-file:,yes-i-really-really-mean-it,include-images,include-dev:,full,incremental"
+
+RAW_ARGS="$*"
+ARGS=$(getopt -o "${SHORT_OPTS}" -l "${LONG_OPTS}" --name "$0" -- "$@") || { usage >&2; exit 2; }
+
+eval set -- "$ARGS"
+
+find_base_dir $PYTHON
+
+PLAYBOOK="${MAINE_BASEDIR}/playbooks/site.yml"
+VERBOSITY=
+EXTRA_OPTS=${EXTRA_OPTS}
+CONFIG_DIR="/etc/maine"
+KOLLA_PASSWORDS_FILE="/etc/kolla/passwords.yml"
+PASSWORDS_FILE="${CONFIG_DIR}/passwords.yml"
+INVENTORY="${CONFIG_DIR}/ustack-hosts"
+DANGER_CONFIRM=
+INCLUDE_IMAGES=
+INCLUDE_DEV=
+BACKUP_TYPE="full"
+# Serial is not recommended and disabled by default. Users can enable it by
+# configuring ANSIBLE_SERIAL variable.
+ANSIBLE_SERIAL=${ANSIBLE_SERIAL:-0}
+
+export ANSIBLE_CONFIG="${MAINE_BASEDIR}/ansible.cfg"
+export ANSIBLE_LOG_PATH="/var/log/maine-ansible.log"
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+
+    (--inventory|-i)
+            INVENTORY="$2"
+            shift 2
+            ;;
+
+    (--playbook|-p)
+            PLAYBOOK="$2"
+            shift 2
+            ;;
+
+    (--skip-tags)
+            EXTRA_OPTS="$EXTRA_OPTS --skip-tags $2"
+            shift 2
+            ;;
+
+    (--tags|-t)
+            EXTRA_OPTS="$EXTRA_OPTS --tags $2"
+            shift 2
+            ;;
+
+    (--verbose|-v)
+            VERBOSITY="$VERBOSITY --verbose"
+            shift 1
+            ;;
+
+    (--configdir)
+            CONFIG_DIR="$2"
+            shift 2
+            ;;
+
+    (--yes-i-really-really-mean-it)
+            if [[ ${RAW_ARGS} =~ "$1" ]]
+            then
+                DANGER_CONFIRM="$1"
+            fi
+            shift 1
+            ;;
+
+    (--include-images)
+            INCLUDE_IMAGES="$1"
+            shift 1
+            ;;
+
+    (--include-dev)
+            INCLUDE_DEV="$1"
+            shift 1
+            ;;
+
+    (--key|-k)
+            VAULT_PASS_FILE="$2"
+            EXTRA_OPTS="$EXTRA_OPTS --vault-password-file=$VAULT_PASS_FILE"
+            shift 2
+            ;;
+
+    (--extra|-e)
+            EXTRA_OPTS="$EXTRA_OPTS -e $2"
+            shift 2
+            ;;
+
+    (--passwords)
+            PASSWORDS_FILE="$2"
+            shift 2
+            ;;
+
+    (--limit)
+            EXTRA_OPTS="$EXTRA_OPTS --limit $2"
+            shift 2
+            ;;
+
+    (--forks)
+            EXTRA_OPTS="$EXTRA_OPTS --forks $2"
+            shift 2
+            ;;
+
+    (--vault-id)
+            EXTRA_OPTS="$EXTRA_OPTS --vault-id $2"
+            shift 2
+            ;;
+
+    (--ask-vault-pass)
+            VERBOSITY="$EXTRA_OPTS --ask-vault-pass"
+            shift 1
+            ;;
+
+    (--vault-password-file)
+            EXTRA_OPTS="$EXTRA_OPTS --vault-password-file $2"
+            shift 2
+            ;;
+
+    (--full)
+            BACKUP_TYPE="full"
+            shift 1
+            ;;
+
+    (--incremental)
+            BACKUP_TYPE="incremental"
+            shift 1
+            ;;
+
+    (--help|-h)
+            usage
+            shift
+            exit 0
+            ;;
+
+    (--)
+            shift
+            break
+            ;;
+
+    (*)
+            echo "error"
+            exit 3
+            ;;
+esac
+done
+
+case "$1" in
+
+(genpwds)
+        ACTION="Generate passwords"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=genpasswords"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/genpasswords.yml"
+        ;;
+(prechecks)
+        ACTION="Pre-deployment checking"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=precheck -e CONFIG_DIR=/etc/kolla -e enable_amphora_prepare=False"
+        ;;
+(check)
+        ACTION="Post-deployment checking"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=check"
+        ;;
+(maine_backup)
+        ACTION="Backup Maine"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=backup"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/maine_backup.yml"
+        ;;
+(mariadb_recovery)
+        ACTION="Attempting to restart mariadb cluster"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=deploy -e common_run=true"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/mariadb_recovery.yml"
+        ;;
+(mariadb_backup)
+        ACTION="Backup MariaDB databases"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=backup -e mariadb_backup_type=${BACKUP_TYPE} -e common_run=true"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/mariadb_backup.yml"
+        ;;
+(cleanup_backup)
+        ACTION="Clean up backup"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=cleanup-backup"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/cleanup-backup.yml"
+        ;;
+(destroy)
+        ACTION="Destroy Kolla containers, volumes and host configuration"
+        PLAYBOOK="${KOLLA_BASEDIR}/ansible/destroy.yml"
+        if [[ "${INCLUDE_IMAGES}" == "--include-images" ]]; then
+            EXTRA_OPTS="$EXTRA_OPTS -e destroy_include_images=yes"
+        fi
+        if [[ "${INCLUDE_DEV}" == "--include-dev" ]]; then
+            EXTRA_OPTS="$EXTRA_OPTS -e destroy_include_dev=yes"
+        fi
+        if [[ "${DANGER_CONFIRM}" != "--yes-i-really-really-mean-it" ]]; then
+            cat << EOF
+WARNING:
+    This will PERMANENTLY DESTROY all deployed kolla containers, volumes and host configuration.
+    There is no way to recover from this action. To confirm, please add the following option:
+    --yes-i-really-really-mean-it
+EOF
+            exit 1
+        fi
+        ;;
+(bifrost-deploy)
+        ACTION="Deploying Bifrost"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bifrost.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=deploy -e maine_action=deploy"
+        ;;
+(bifrost-enroll)
+        ACTION="Enrolling Servers with Bifrost"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bifrost.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=enroll -e maine_action=enroll"
+        ;;
+(bifrost-inspect)
+        ACTION="Inpect Servers with Bifrost"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bifrost.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=inspect -e maine_action=inspect"
+        ;;
+(bifrost-provide)
+        ACTION="Provide Servers with Bifrost"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bifrost.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=provide -e maine_action=provide"
+        ;;
+(bifrost-deploy-servers)
+        ACTION="Deploying servers with bifrost"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bifrost.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=deploy-servers -e maine_action=deploy-servers"
+        ;;
+(bootstrap-servers)
+        ACTION="Bootstraping servers"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/bootstrap.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=bootstrap-servers -e maine_action=bootstrap-servers"
+        ;;
+(bootstrap-networks)
+        ACTION="Bootstraping networks"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/network.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=deploy -e maine_action=deploy"
+        ;;
+(bootstrap-hosts)
+        ACTION="Bootstraping hosts"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/host.yml"
+        EXTRA_OPTS="$EXTRA_OPTS"
+        ;;
+(configure-iptables)
+        ACTION="Configure iptables"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/configure-iptables.yml"
+        EXTRA_OPTS="$EXTRA_OPTS"
+        ;;
+(configure-chrony-ha)
+        ACTION="Configure chrony ha"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/configure-chrony-ha.yml"
+        EXTRA_OPTS="$EXTRA_OPTS"
+        ;;
+(deploy-ceph)
+        ACTION="Deploying cephadm-ansible playbooks"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/deploy-ceph.yml"
+        EXTRA_OPTS="$EXTRA_OPTS"
+        ;;
+(integrate-ceph)
+        ACTION="Integrating ceph"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/integrate-ceph.yml"
+        EXTRA_OPTS="$EXTRA_OPTS -e kolla_action=integrate -e maine_action=integrate"
+        ;;
+(gather-facts)
+        ACTION="Gathering Ansible facts"
+        PLAYBOOK="${KOLLA_BASEDIR}/ansible/gather-facts.yml"
+        ;;
+(deploy)
+        ACTION="Deploying Playbooks"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=deploy"
+        ;;
+(post-deploy)
+        ACTION="Post-Deploying Playbooks"
+        PLAYBOOK="${MAINE_BASEDIR}/playbooks/post-deploy.yml"
+        ;;
+(pull)
+        ACTION="Pulling Docker images"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=pull"
+        ;;
+(upgrade)
+        ACTION="Upgrading OpenStack Environment"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=upgrade -e kolla_serial=${ANSIBLE_SERIAL}"
+        ;;
+(reconfigure)
+        ACTION="Reconfigure OpenStack service"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=reconfigure -e kolla_serial=${ANSIBLE_SERIAL}"
+        ;;
+(stop)
+        ACTION="Stop Kolla containers"
+        PLAYBOOK="${KOLLA_BASEDIR}/ansible/stop.yml"
+        ;;
+(certificates)
+        ACTION="Generate TLS Certificates"
+        PLAYBOOK="${KOLLA_BASEDIR}/ansible/certificates.yml"
+        ;;
+(genconfig)
+        ACTION="Generate configuration files for enabled OpenStack services"
+        EXTRA_OPTS="$EXTRA_OPTS -e maine_action=config"
+        ;;
+(bash-completion)
+        bash_completion
+        exit 0
+        ;;
+(*)     usage
+        exit 0
+        ;;
+esac
+
+CONFIG_OPTS="-e @${KOLLA_PASSWORDS_FILE} -e @${PASSWORDS_FILE} -e CONFIG_DIR=${CONFIG_DIR} -e @${CONFIG_DIR}/kolla-extra-globals.yml -e @${CONFIG_DIR}/globals.yml"
+CMD="ansible-playbook -i $INVENTORY $CONFIG_OPTS $EXTRA_OPTS $PLAYBOOK $VERBOSITY"
+process_cmd

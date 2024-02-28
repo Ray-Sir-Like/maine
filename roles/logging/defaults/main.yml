@@ -1,0 +1,269 @@
+---
+project_name: "logging"
+
+logging_services:
+  logging-opensearch:
+    container_name: logging_opensearch
+    group: logging_opensearch
+    enabled: true
+    image: "{{ logging_opensearch_image_full }}"
+    environment:
+      OPENSEARCH_JAVA_OPTS: "{{ logging_opensearch_java_opts }}"
+    volumes: "{{ logging_opensearch_default_volumes + logging_opensearch_extra_volumes }}"
+    dimensions: "{{ logging_opensearch_dimensions }}"
+    haproxy:
+      logging_opensearch:
+        enabled: true
+        mode: "http"
+        external: false
+        port: "{{ logging_opensearch_port }}"
+        frontend_http_extra:
+          - "option dontlog-normal"
+          - "timeout client {{ haproxy_logging_opensearch_client_timeout }}"
+        backend_http_extra:
+          - "timeout server {{ haproxy_logging_opensearch_server_timeout }}"
+  logging-opensearch-curator:
+    container_name: logging_opensearch_curator
+    group: logging_opensearch_curator
+    environment: {}
+    enabled: true
+    image: "{{ logging_opensearch_curator_image_full }}"
+    volumes: "{{ logging_opensearch_curator_default_volumes + logging_opensearch_curator_extra_volumes }}"
+    dimensions: "{{ logging_opensearch_curator_dimensions }}"
+  logging-opensearch-dashboards:
+    container_name: logging_opensearch_dashboards
+    group: logging_opensearch_dashboards
+    image: "{{ logging_opensearch_dashboards_image_full }}"
+    environment:
+      OPENSEARCH_DASHBOARDS_SECURITY_PLUGIN: "False"
+    enabled: true
+    volumes: "{{ logging_opensearch_dashboards_default_volumes + logging_opensearch_dashboards_extra_volumes }}"
+    dimensions: "{{ logging_opensearch_dashboards_dimensions }}"
+    haproxy:
+      logging_opensearch_dashboards:
+        enabled: true
+        mode: "http"
+        external: false
+        port: "{{ logging_opensearch_dashboards_port }}"
+      logging_opensearch_dashboards_external:
+        enabled: true
+        mode: "http"
+        external: true
+        port: "{{ logging_opensearch_dashboards_port_external }}"
+  logging-fluentd:
+    container_name: logging_fluentd
+    group: logging_fluentd
+    enabled: true
+    image: "{{ fluentd_image_full }}"
+    environment:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    volumes: "{{ fluentd_default_volumes + fluentd_extra_volumes }}"
+    dimensions: "{{ fluentd_dimensions }}"
+
+####################
+# HAProxy
+####################
+haproxy_logging_opensearch_client_timeout: "5m"
+haproxy_logging_opensearch_server_timeout: "5m"
+
+####################
+# Opensearch
+####################
+logging_opensearch_cluster_name: "kolla_logging"
+logging_opensearch_heap_size: "1g"
+logging_opensearch_java_opts: "{% if logging_opensearch_heap_size %}-Xms{{ logging_opensearch_heap_size }} -Xmx{{ logging_opensearch_heap_size }}{%endif%} -Dlog4j2.formatMsgNoLookups=true"
+
+logging_opensearch_upgrade_synced_retries: 30
+logging_opensearch_upgrade_synced_delay: 10
+
+#######################
+# Opensearch Curator
+#######################
+
+# Helper variable used to define the default hour Curator runs to avoid
+# simultaneous runs in multinode deployments.
+logging_opensearch_curator_instance_id: "{{ groups['logging_opensearch_curator'].index(inventory_hostname) }}"
+
+# How frequently Curator runs.
+# For multinode deployments of Curator you should ensure each node has
+# a different schedule so that Curator does not run simultaneously on
+# multiple nodes. Use hostvars or parameterize like in the default
+# below.
+# The default depends on Curator's id as defined above which dictates
+# the daily hour the schedule runs (0, 1, etc.).
+logging_opensearch_curator_cron_schedule: "0 {{ logging_opensearch_curator_instance_id }} * * *"
+
+# When set to True, Curator will not modify Elasticsearch data, but
+# will print what it *would* do to the Curator log file. This is a
+# useful way of checking that Curator actions are working as expected.
+logging_opensearch_curator_dry_run: false
+
+# Index prefix pattern. Any indices matching this regex will
+# be managed by Curator.
+logging_opensearch_curator_index_pattern: "^{{ logging_opensearch_dashboards_log_prefix }}-.*"
+
+# Duration after which an index is staged for deletion. This is
+# implemented by closing the index. Whilst in this state the index
+# contributes negligible load on the cluster and may be manually
+# re-opened if required.
+logging_opensearch_curator_soft_retention_period_days: 30
+
+# Duration after which an index is permanently erased from the cluster.
+logging_opensearch_curator_hard_retention_period_days: 60
+
+####################
+# OpenSearch Dashboards
+####################
+logging_opensearch_dashboards_default_app_id: "discover"
+logging_opensearch_dashboards_opensearch_request_timeout: 300000
+logging_opensearch_dashboards_opensearch_shard_timeout: 0
+logging_opensearch_dashboards_opensearch_ssl_verify: false
+
+####################
+# Default index
+####################
+logging_opensearch_dashboards_default_index_pattern: "{{ logging_opensearch_dashboards_log_prefix }}-*"
+logging_opensearch_dashboards_default_index:
+  attributes:
+    title: "{{ logging_opensearch_dashboards_default_index_pattern }}"
+    timeFieldName: "@timestamp"
+logging_opensearch_dashboards_default_index_options:
+  index.mapper.dynamic: true
+
+####################
+# Fluentd
+####################
+syslog_haproxy_facility: "local1"
+syslog_glance_tls_proxy_facility: "local2"
+syslog_neutron_tls_proxy_facility: "local4"
+
+syslog_facilities:
+  - name: "haproxy"
+    enabled: "{{ enable_haproxy | bool and inventory_hostname in groups['haproxy'] }}"
+    facility: "{{ syslog_haproxy_facility }}"
+    logdir: "haproxy"
+    logfile: "haproxy_latest"
+  - name: "glance_tls_proxy"
+    enabled: "{{ glance_enable_tls_backend | bool and inventory_hostname in groups['glance-api'] }}"
+    facility: "{{ syslog_glance_tls_proxy_facility }}"
+    logdir: "glance-tls-proxy"
+    logfile: "glance-tls-proxy"
+  - name: "neutron_tls_proxy"
+    enabled: "{{ neutron_enable_tls_backend | bool and inventory_hostname in groups['neutron-server'] }}"
+    facility: "{{ syslog_neutron_tls_proxy_facility }}"
+    logdir: "neutron-tls-proxy"
+    logfile: "neutron-tls-proxy"
+
+####################
+# Docker
+####################
+logging_opensearch_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/opensearch"
+logging_opensearch_tag: "{{ openstack_tag }}"
+logging_opensearch_image_full: "{{ logging_opensearch_image }}:{{ logging_opensearch_tag }}"
+logging_opensearch_dimensions: "{{ default_container_dimensions }}"
+
+logging_opensearch_curator_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/opensearch-curator"
+logging_opensearch_curator_tag: "{{ openstack_tag }}"
+logging_opensearch_curator_image_full: "{{ logging_opensearch_curator_image }}:{{ logging_opensearch_curator_tag }}"
+logging_opensearch_curator_dimensions: "{{ default_container_dimensions }}"
+
+logging_opensearch_dashboards_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/opensearch-dashboards"
+logging_opensearch_dashboards_tag: "{{ openstack_tag }}"
+logging_opensearch_dashboards_image_full: "{{ logging_opensearch_dashboards_image }}:{{ logging_opensearch_dashboards_tag }}"
+logging_opensearch_dashboards_dimensions: "{{ default_container_dimensions }}"
+
+logging_opensearch_default_volumes:
+  - "{{ node_config_directory }}/logging-opensearch/:{{ container_config_directory }}/"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "{{ logging_opensearch_datadir_volume }}:/var/lib/opensearch/data"
+  - "kolla_logs:/var/log/kolla/"
+logging_opensearch_curator_default_volumes:
+  - "{{ node_config_directory }}/logging-opensearch-curator/:{{ container_config_directory }}/"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla"
+logging_opensearch_dashboards_default_volumes:
+  - "{{ node_config_directory }}/logging-opensearch-dashboards/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+
+logging_opensearch_extra_volumes: "{{ default_extra_volumes }}"
+logging_opensearch_curator_extra_volumes: "{{ default_extra_volumes }}"
+logging_opensearch_dashboards_extra_volumes: "{{ default_extra_volumes }}"
+
+fluentd_opensearch_scheme: "{{ internal_protocol }}"
+fluentd_opensearch_path: ""
+fluentd_opensearch_ssl_version: "TLSv1_2"
+fluentd_opensearch_ssl_verify: "true"
+fluentd_opensearch_user: ""
+fluentd_opensearch_password: ""
+fluentd_opensearch_cacert: "{{ openstack_cacert }}"
+fluentd_opensearch_request_timeout: "60s"
+
+fluentd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/fluentd"
+fluentd_tag: "{{ openstack_tag }}"
+fluentd_image_full: "{{ fluentd_image }}:{{ fluentd_tag }}"
+fluentd_dimensions: "{{ default_container_dimensions }}"
+
+fluentd_default_volumes:
+  - "{{ node_config_directory }}/logging-fluentd/:{{ container_config_directory }}/:ro"
+  - "/etc/localtime:/etc/localtime:ro"
+  - "kolla_logs:/var/log/kolla/"
+  - "logging_fluentd:/var/lib/td-agent/data/"
+fluentd_extra_volumes: "{{ default_extra_volumes }}"
+
+
+####################
+# Fluentd
+####################
+
+fluentd_input_openstack_services:
+  - name: aodh
+    enabled: "{{ enable_aodh | bool }}"
+  - name: barbican
+    enabled: "{{ enable_barbican | bool }}"
+  - name: ceilometer
+    enabled: "{{ enable_ceilometer | bool }}"
+  - name: cinder
+    enabled: "{{ enable_cinder | bool }}"
+  - name: cloudkitty
+    enabled: "{{ enable_cloudkitty | bool }}"
+  - name: designate
+    enabled: "{{ enable_designate | bool }}"
+  - name: glance
+    enabled: "{{ enable_glance | bool }}"
+  - name: heat
+    enabled: "{{ enable_heat | bool }}"
+  - name: horizon
+    enabled: "{{ enable_horizon | bool }}"
+  - name: ironic
+    enabled: "{{ enable_ironic | bool }}"
+  - name: ironic-inspector
+    enabled: "{{ enable_ironic | bool }}"
+  - name: keystone
+    enabled: "{{ enable_keystone | bool }}"
+  - name: kuryr
+    enabled: "{{ enable_kuryr | bool }}"
+  - name: manila
+    enabled: "{{ enable_manila | bool }}"
+  - name: masakari
+    enabled: "{{ enable_masakari | bool }}"
+  - name: mistral
+    enabled: "{{ enable_mistral | bool }}"
+  - name: neutron
+    enabled: "{{ enable_neutron | bool }}"
+  - name: nova
+    enabled: "{{ enable_nova | bool }}"
+  - name: octavia
+    enabled: "{{ enable_octavia | bool }}"
+  - name: panko
+    enabled: "{{ enable_panko | bool }}"
+  - name: rally
+    enabled: "{{ enable_rally | bool }}"
+  - name: senlin
+    enabled: "{{ enable_senlin | bool }}"
+  - name: prometheus-proxy
+    enabled: "{{ enable_prometheus_proxy }}"
+  - name: watcher
+    enabled: "{{ enable_watcher | bool }}"
+
+fluentd_enabled_input_openstack_services: "{{ fluentd_input_openstack_services | selectattr('enabled', 'equalto', true) | map(attribute='name') | list }}"

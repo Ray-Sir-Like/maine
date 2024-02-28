@@ -1,0 +1,39 @@
+auth:
+  domain_id: "{{ default_user_domain_id }}"
+  auth_url: "{{ keystone_internal_url }}"
+  project_name: "service"
+  username: "{{ malphite_keystone_user }}"
+  password: "{{ malphite_keystone_password }}"
+
+db_address: "{{ malphite_database_user }}:{{ malphite_database_password }}@tcp({{ malphite_database_address }})/{{ malphite_database_name }}?parseTime=true&loc=Local"
+
+assignee:
+{% for role in malphite_ticket_assignees %}
+  - {{ role }}
+{% endfor %}
+
+dispatcher:
+  mode: "{{ malphite_auto_dispacth_mode }}"
+{% if malphite_auto_dispacth_mode == "role_based" %}
+  role_based:
+    auto_dispatch_direction:
+{% for role in malphite_ticket_assignees %}
+      - {{ role }}
+{% endfor %}
+{% endif %}
+
+{% if malphite_attachment_storage == 's3' %}
+storage: "s3"
+s3:
+  endpoint: "{{ internal_protocol }}://{{ ceph_rgw_external_fqdn | put_address_in_context('url') }}:{{ s3_proxy_server_port }}"
+  access_key: "{{ malphite_s3_access_key }}"
+  secret_key: "{{ malphite_s3_secret_key }}"
+{% else %}
+storage: "file_system"
+file_system:
+  path: "{{ malphite_attachment_file_system_path }}"
+{% endif %}
+
+server:
+  host: "{{ api_interface_address }}"
+  port: "{{ malphite_port }}"

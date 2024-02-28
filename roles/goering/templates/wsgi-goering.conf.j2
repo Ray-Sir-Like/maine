@@ -1,0 +1,23 @@
+Listen {{ api_interface_address }}:{{ goering_api_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<VirtualHost *:{{ goering_api_port }}>
+
+  ErrorLog "/var/log/kolla/goering/goering-api-error.log"
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "/var/log/kolla/goering/goering-api-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess goering group=goering processes={{ openstack_service_workers }} threads=1 user=goering
+  WSGIProcessGroup goering
+  WSGIScriptAlias / "/usr/bin/goering-api"
+
+  <Directory "/usr/bin">
+       <FilesMatch "^goering-api$">
+            Require all granted
+       </FilesMatch>
+  </Directory>
+
+</VirtualHost>

@@ -1,0 +1,12 @@
+{
+    "command": "/opt/blackbox_exporter/blackbox_exporter --config.file=/etc/blackbox_exporter/blackbox_exporter.yml --web.listen-address={{ monitoring_interface_address }}:{{ hawkeye_blackbox_exporter_port }}",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/blackbox_exporter.yml",
+            "dest": "/etc/blackbox_exporter/blackbox_exporter.yml",
+            "owner": "root",
+            "perm": "0600"
+        }
+    ],
+    "permissions": []
+}

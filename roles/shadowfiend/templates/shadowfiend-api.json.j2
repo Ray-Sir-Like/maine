@@ -1,0 +1,32 @@
+{% set shadowfiend_cmd = 'apache2' if kolla_base_distro in ['ubuntu', 'debian'] else 'httpd' %}
+{% set shadowfiend_dir = 'apache2/conf-enabled' if kolla_base_distro in ['ubuntu', 'debian'] else 'httpd/conf.d' %}
+{
+    "command": "{{ shadowfiend_cmd }} -DFOREGROUND",
+    "config_files": [
+        {
+            "source": "{{ container_config_directory }}/shadowfiend.conf",
+            "dest": "/etc/shadowfiend/shadowfiend.conf",
+            "owner": "shadowfiend",
+            "perm": "0600"
+        }{% if shadowfiend_policy_file is defined %},
+        {
+            "source": "{{ container_config_directory }}/{{ shadowfiend_policy_file }}",
+            "dest": "/etc/shadowfiend/{{ shadowfiend_policy_file }}",
+            "owner": "shadowfiend",
+            "perm": "0600"
+        }{% endif %},
+        {
+            "source": "{{ container_config_directory }}/wsgi-shadowfiend.conf",
+            "dest": "/etc/{{ shadowfiend_dir }}/wsgi-shadowfiend.conf",
+            "owner": "shadowfiend",
+            "perm": "0600"
+        }
+    ],
+    "permissions": [
+        {
+            "path": "/var/log/kolla/shadowfiend",
+            "owner": "shadowfiend:shadowfiend",
+            "recurse": true
+        }
+    ]
+}

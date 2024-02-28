@@ -1,0 +1,52 @@
+---
+- name: Clean up maine backup
+  hosts:
+    - localhost
+  vars:
+    maine_backup_dir: "/opt/maine_backup"
+    maine_backup_qty: 4
+  gather_facts: no
+  tasks:
+    - name: Check maine backup directory stat
+      stat:
+        path: "{{ maine_backup_dir }}"
+      register: maine_backup
+
+    - name: Run clean up backup script
+      shell: |
+        #!/bin/bash
+        set -x
+
+        BACKUP_TO_BE_DELETED=$(ls -tr {{ maine_backup_dir }} | head -n -{{ maine_backup_qty }})
+        rm -rf ${BACKUP_TO_BE_DELETED}
+      when: maine_backup.stat.exists
+  tags:
+    - maine
+
+- name: Clean up mariadb backup
+  hosts:
+    - mariadb
+  vars:
+    mariadb_backup_dir: "/var/lib/docker/volumes/mariadb_backup/_data"
+    mariadb_full_backup_qty: 4
+    mariadb_incremental_backup_qty: 30
+  gather_facts: no
+  tasks:
+    - name: Check mariadb backup directory stat
+      stat:
+        path: "{{ mariadb_backup_dir }}"
+      register: mariadb_backup
+
+    - name: Run clean up backup script
+      shell: |
+        #!/bin/bash
+        set -x
+
+        FULL_BACKUP_TO_BE_DELETED=$(ls -tr {{ mariadb_backup_dir }}/mysqlbackup-* | head -n -{{ mariadb_full_backup_qty }})
+        rm -rf ${FULL_BACKUP_TO_BE_DELETED}
+
+        INCREMENTAL_BACKUP_TO_BE_DELETED=$(ls -tr {{ mariadb_backup_dir }}/incremental-* | head -n -{{ mariadb_incremental_backup_qty }})
+        rm -rf ${INCREMENTAL_BACKUP_TO_BE_DELETED}
+      when: mariadb_backup.stat.exists
+  tags:
+    - mariadb

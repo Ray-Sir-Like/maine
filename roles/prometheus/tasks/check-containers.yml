@@ -1,0 +1,25 @@
+---
+# Deprecated old container
+- name: Ensure deprecated containers absent
+  become: true
+  kolla_docker:
+    name: "{{ item }}"
+    action: remove_container
+  loop: "{{ deprecated_prometheus_services }}"
+
+- name: Check prometheus containers
+  become: true
+  kolla_docker:
+    action: "compare_container"
+    common_options: "{{ docker_common_options }}"
+    name: "{{ item.value.container_name }}"
+    image: "{{ item.value.image }}"
+    volumes: "{{ item.value.volumes|reject('equalto', '')|list }}"
+    dimensions: "{{ item.value.dimensions }}"
+    healthcheck: "{{ item.value.healthcheck | default(omit) }}"
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ prometheus_services }}"
+  notify:
+    - "Restart {{ item.key }} container"

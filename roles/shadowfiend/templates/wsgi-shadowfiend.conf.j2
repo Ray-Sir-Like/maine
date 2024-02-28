@@ -1,0 +1,23 @@
+Listen {{ api_interface_address }}:{{ shadowfiend_api_port }}
+
+ServerSignature Off
+ServerTokens Prod
+TraceEnable off
+
+<VirtualHost *:{{ shadowfiend_api_port }}>
+
+  ErrorLog "/var/log/kolla/shadowfiend/shadowfiend-api-error.log"
+  LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D \"%{Referer}i\" \"%{User-Agent}i\"" logformat
+  CustomLog "/var/log/kolla/shadowfiend/shadowfiend-api-access.log" logformat
+  WSGIApplicationGroup %{GLOBAL}
+  WSGIDaemonProcess shadowfiend group=shadowfiend processes={{ openstack_service_workers }} threads=1 user=shadowfiend
+  WSGIProcessGroup shadowfiend
+  WSGIScriptAlias / "/usr/bin/shadowfiend-api"
+
+  <Directory "/usr/bin">
+      <FilesMatch "^shadowfiend-api$">
+          Require all granted
+      </FilesMatch>
+  </Directory>
+
+</VirtualHost>

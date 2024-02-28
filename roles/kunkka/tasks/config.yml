@@ -1,0 +1,262 @@
+---
+- name: Ensuring config directories exist
+  file:
+    path: "{{ node_config_directory }}/{{ item.key }}"
+    state: "directory"
+    owner: "{{ config_owner_user }}"
+    group: "{{ config_owner_group }}"
+    mode: "0770"
+  become: true
+  when:
+    - inventory_hostname in groups[item.value.group]
+    - item.value.enabled | bool
+  with_dict: "{{ kunkka_services }}"
+
+- name: Ensuring logo directories exist
+  vars:
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  file:
+    path: "{{ node_config_directory }}/{{ item.key }}/logo"
+    state: directory
+    mode: "0660"
+  become: true
+  register: kunkka_logo_directory
+  when:
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  with_dict: "{{ kunkka_services }}"
+
+- name: Check if generic shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: generic_stat
+  with_first_found:
+    - files: "{{ kunkka_logo.generic }}"
+      paths:
+        - "{{ node_custom_config }}/kunkka/"
+      skip: true
+
+- name: Check if navbar shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: navbar_stat
+  with_first_found:
+    - files: "{{ kunkka_logo.navbar }}"
+      paths:
+        - "{{ node_custom_config }}/kunkka/"
+      skip: true
+
+- name: Check if favicon shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: favicon_stat
+  with_first_found:
+    - files: "{{ kunkka_logo.favicon }}"
+      paths:
+        - "{{ node_custom_config }}/kunkka/"
+      skip: true
+
+- name: Check if background shall be overwritten
+  local_action: stat path="{{ item }}"
+  run_once: True
+  register: background_stat
+  with_first_found:
+    - files: "{{ kunkka_logo.background }}"
+      paths:
+        - "{{ node_custom_config }}/kunkka/"
+      skip: true
+
+- name: Set generic logo file
+  set_fact:
+    kunkka_generic_logo_file: "{{ kunkka_logo.generic }}"
+  when:
+    - generic_stat.results
+
+- name: Set navbar logo file
+  set_fact:
+    kunkka_navbar_logo_file: "{{ kunkka_logo.navbar }}"
+  when:
+    - navbar_stat.results
+
+- name: Set favicon logo file
+  set_fact:
+    kunkka_favicon_logo_file: "{{ kunkka_logo.favicon }}"
+  when:
+    - favicon_stat.results
+
+- name: Set background logo file
+  set_fact:
+    kunkka_background_logo_file: "{{ kunkka_logo.background }}"
+  when:
+    - background_stat.results
+
+- name: Copying over existing generic logo file
+  become: true
+  vars:
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  copy:
+    src: "{{ node_custom_config }}/{{ item.key }}/{{ kunkka_logo.generic }}"
+    dest: "{{ node_config_directory }}/{{ item.key }}/logo/{{ kunkka_logo.generic }}"
+  when:
+    - kunkka_generic_logo_file is defined
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over existing navbar logo file
+  become: true
+  vars:
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  copy:
+    src: "{{ node_custom_config }}/{{ item.key }}/{{ kunkka_logo.navbar }}"
+    dest: "{{ node_config_directory }}/{{ item.key }}/logo/{{ kunkka_logo.navbar }}"
+  when:
+    - kunkka_navbar_logo_file is defined
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over existing favicon logo file
+  become: true
+  vars:
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  copy:
+    src: "{{ node_custom_config }}/{{ item.key }}/{{ kunkka_logo.favicon }}"
+    dest: "{{ node_config_directory }}/{{ item.key }}/logo/{{ kunkka_logo.favicon }}"
+  when:
+    - kunkka_favicon_logo_file is defined
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over existing background logo file
+  become: true
+  vars:
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  copy:
+    src: "{{ node_custom_config }}/kunkka/{{ kunkka_logo.background }}"
+    dest: "{{ node_config_directory }}/{{ item.key }}/logo/{{ kunkka_logo.background }}"
+  when:
+    - kunkka_background_logo_file is defined
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  with_dict: "{{ kunkka_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over kunkka config for services
+  vars:
+    service_name: "kunkka"
+    kunkka_is_admin: False
+    kunkka_listen_port: "{{ kunkka_console_port }}"
+  become: true
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/kunkka.conf.j2"
+      - "{{ node_custom_config }}/kunkka.conf"
+      - "{{ node_custom_config }}/kunkka/{{ service_name }}.conf"
+      - "{{ node_custom_config }}/kunkka/{{ inventory_hostname }}/kunkka.conf"
+    dest: "{{ node_config_directory }}/{{ service_name }}/kunkka.conf"
+    mode: "0660"
+  when:
+    - kunkka_services[service_name].enabled | bool
+  notify:
+    - "Restart {{ service_name }} container"
+
+- name: Copying over kunkka-admin config for services
+  vars:
+    service_name: "kunkka-admin"
+    kunkka_is_admin: True
+    kunkka_listen_port: "{{ kunkka_admin_port }}"
+  become: true
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/kunkka.conf.j2"
+      - "{{ node_custom_config }}/kunkka.conf"
+      - "{{ node_custom_config }}/kunkka/{{ service_name }}.conf"
+      - "{{ node_custom_config }}/kunkka/{{ inventory_hostname }}/kunkka.conf"
+    dest: "{{ node_config_directory }}/{{ service_name }}/kunkka.conf"
+    mode: "0660"
+  when:
+    - kunkka_services[service_name].enabled | bool
+  notify:
+    - "Restart {{ service_name }} container"
+
+- name: Copying over kunkka-message config for services
+  vars:
+    service_name: "kunkka-message"
+  become: true
+  merge_configs:
+    sources:
+      - "{{ role_path }}/templates/kunkka-message.conf.j2"
+      - "{{ node_custom_config }}/kunkka.conf"
+      - "{{ node_custom_config }}/kunkka/{{ service_name }}.conf"
+      - "{{ node_custom_config }}/kunkka/{{ inventory_hostname }}/kunkka-message.conf"
+    dest: "{{ node_config_directory }}/{{ service_name }}/{{ service_name }}.conf"
+    mode: "0660"
+  when:
+    - kunkka_services[service_name].enabled | bool
+  notify:
+    - "Restart {{ service_name }} container"
+
+- name: Copying over extra CA certificates
+  become: true
+  copy:
+    src: "{{ node_config }}/certificates/ca/"
+    dest: "{{ node_config_directory }}/{{ item.key }}/ca-certificates"
+    mode: "0644"
+  when:
+    - item.value.enabled | bool
+    - inventory_hostname in groups[item.value.group]
+    - kolla_copy_ca_into_containers | bool
+  with_dict: "{{ kunkka_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over config.json files for services
+  vars:
+    service_name: "{{ item.key }}"
+    services_need_kunkka_conf:
+      - "kunkka"
+      - "kunkka-admin"
+  template:
+    src: "kunkka.json.j2"
+    dest: "{{ node_config_directory }}/{{ item.key }}/config.json"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  with_dict: "{{ kunkka_services }}"
+  notify:
+    - "Restart {{ item.key }} container"
+
+- name: Copying over config.json files for kunkka-message
+  vars:
+    service_name: "{{ item.key }}"
+    services_need_kunkka_conf:
+      - "kunkka-message"
+  template:
+    src: "{{ item.key }}.json.j2"
+    dest: "{{ node_config_directory }}/{{ item.key }}/config.json"
+    mode: "0660"
+  become: true
+  when:
+    - item.value.enabled | bool
+    - item.key in services_need_kunkka_conf
+  with_dict: "{{ kunkka_services }}"
+  notify:
+    - "Restart {{ item.key }} container"

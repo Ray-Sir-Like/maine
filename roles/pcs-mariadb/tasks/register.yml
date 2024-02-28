@@ -1,0 +1,7 @@
+---
+# hacker: database on first mariadb node may be slave
+- include_role:
+    name: mariadb
+    tasks_from: register
+  vars:
+    api_interface_address: "{{ kolla_internal_vip_address }}"

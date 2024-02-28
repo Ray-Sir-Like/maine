@@ -1,0 +1,1351 @@
+---
+################
+# Release
+################
+openstack_tag_suffix: "{{ '-oe2203' if ansible_distribution == 'openEuler' else  '-c8s' }}"
+openstack_aggressive_release: "{{ openstack_release }}"
+openstack_aggressive_tag: "{{ openstack_aggressive_release ~ openstack_tag_suffix }}"
+
+#################
+# Ceph
+################
+## Note(Yao Ning): only consider to support x86_64 and aarch64
+ceph_docker_namespace: "{{ 'uds3' if ansible_architecture == 'x86_64' else 'uds3-aarch64' }}"
+skip_add_osd_daemon: false
+ceph_nova_keyring: "ceph.client.nova.keyring"
+ceph_cinder_backup_keyring: "ceph.client.cinder.keyring"
+ceph_cineder_backup_user: "cinder"
+
+#####################
+# Seed Network
+#####################
+seed_interface_address: "{{ 'seed' | kolla_address('localhost') }}"
+seed_address_family: "{{ api_address_family }}"
+
+docker_namespace: "uos7"
+docker_registry_port: 4000
+docker_registry: "{{ seed_interface_address }}:{{ docker_registry_port }}"
+
+repo_port: 4100
+repo_baseurl: "http://{{ seed_interface_address }}:{{ repo_port }}"
+
+##################
+## Bifrost
+##################
+bifrost_network_interface: "{{ seed_interface }}"
+bifrost_network_interface_address: "{{ 'bifrost_network' | kolla_address('localhost') }}"
+bifrost_network_address_family: "{{ seed_address_family }}"
+
+bifrost_dhcp_addr_start_default: 200
+bifrost_dhcp_addr_end_default: 250
+dhcp_pool_start: "{{ seed_interface_address | regex_replace('(^.*\\.).*$', '\\1') }}{{ bifrost_dhcp_addr_start_default }}"
+dhcp_pool_end: "{{ seed_interface_address | regex_replace('(^.*\\.).*$', '\\1') }}{{ bifrost_dhcp_addr_end_default }}"
+dhcp_static_mask: "{{ hostvars[inventory_hostname]['ansible_' + seed_interface]['ipv4']['netmask'] }}"
+
+############################
+## Audit OpenStack resource
+############################
+audit_notifications_topic: "{{ notification_topics }}"
+audit_ingore_users: "aodh,barbican,glance,cinder,nova,placement,neutron,heat,mistral,panko,manila,ceilometer,designate,cloudkitty,senlin,octavia,masakari,zaqar,kunkka"
+audit_ignore_req: "GET,HEAD"
+enable_audit: "no"
+enable_audit_notifications: "no"
+enable_manila_audit: "{{ enable_audit }}"
+enable_heat_audit: "{{ enable_audit }}"
+enable_designate_audit: "{{ enable_audit }}"
+enable_senlin_audit: "{{ enable_audit }}"
+enable_aodh_audit: "{{ enable_audit }}"
+enable_cinder_audit: "{{ enable_audit }}"
+enable_glance_audit: "{{ enable_audit }}"
+enable_nova_audit: "{{ enable_audit }}"
+enable_neutron_audit: "{{ enable_audit }}"
+enable_barbican_audit: "{{ enable_audit }}"
+
+################
+# Chrony options
+################
+# A list contains ntp servers
+external_ntp_servers:
+  - 0.pool.ntp.org
+  - 1.pool.ntp.org
+  - 2.pool.ntp.org
+  - 3.pool.ntp.org
+
+####################
+# Database options
+####################
+database_max_pool_size: 20
+
+####################
+# Networking Options
+####################
+pxe_mtu: 1500
+service_mtu: 9000
+bond_name: bond0
+
+migration_interface: "{{ api_interface }}"
+migration_interface_address: "{{ 'migration' | kolla_address }}"
+
+storage_interface: "{{ api_interface }}"
+storage_interface_address: "{{ 'storage' | kolla_address }}"
+storage_address_family: "{{ api_address_family }}"
+
+storage_mgmt_interface: "{{ api_interface }}"
+storage_mgmt_interface_address: "{{ 'storage_mgmt' | kolla_address }}"
+storage_mgmt_address_family: "{{ api_address_family }}"
+
+monitoring_interface: "{{ api_interface }}"
+monitoring_interface_address: "{{ 'monitoring' | kolla_address }}"
+monitoring_address_family: "{{ api_address_family }}"
+
+kolla_dev_repos_git: "https://git.ustack.com/openstack"
+
+#########################
+# Internal Image options
+#########################
+distro_python_version_map: {
+  "centos": "3.6",
+  "debian": "3.7",
+  "rhel": "3.6",
+  "ubuntu": "3.6"
+}
+
+distro_python_version: "{{ distro_python_version_map[kolla_base_distro] }}"
+
+################################
+# Rabbitmq Exchange Definication
+################################
+notification_topics: "notifications"
+
+################
+# Docker options
+################
+# Docker networking options
+docker_disable_default_iptables_rules: "yes"
+docker_disable_default_network: "{{ docker_disable_default_iptables_rules }}"
+docker_disable_ip_forward: "{{ docker_disable_default_iptables_rules }}"
+
+######################
+# UStack infra options
+######################
+disable_local_repository: "no"
+enable_logging: "no"
+
+########################
+# UStack service options
+########################
+# Ustack options are specified here
+enable_furion: "no"
+enable_goering: "no"
+enable_hacluster: "yes"
+enable_kunkka: "yes"
+enable_ryze: "no"
+enable_lulu: "no"
+enable_malphite: "no"
+enable_masakari: "no"
+enable_masakari_hostmonitor: "no"
+enable_neutron_uplugin_agent: "yes"
+enable_pdns: "{{ enable_designate | bool }}"
+enable_porsche: "no"
+enable_shadowfiend: "no"
+enable_s3: "no"
+enable_zaqar: "no"
+enable_juggernaut: "no"
+
+################
+# Furion options
+################
+furion_agent_rpc_port: "9002"
+furion_server_rpc_port: "9003"
+furion_server_port: "9004"
+
+#################
+# Goering options
+#################
+goering_api_port: "18779"
+goering_processor_max_workers: "{{ openstack_service_workers }}"
+
+#######################
+# Masakari options
+#######################
+masakari_api_port: "15868"
+masakari_api_listen_port: "{{ masakari_api_port }}"
+masakari_monitors_power_off_driver: "stonith"
+masakari_monitors_monitoring_interval: "30"
+masakari_enable_crossvalidation: "no"
+
+#################
+# Porsche options
+#################
+porsche_api_port: "18778"
+porsche_processor_max_workers: "{{ openstack_service_workers }}"
+
+##################
+# PowerDNS options
+##################
+pdns_webserver_port: 8081
+
+######################
+# Shadowfiend options
+######################
+shadowfiend_api_port: "8686"
+shadowfiend_api_listen_port: "{{ shadowfiend_api_port }}"
+shadowfiend_processor_period: 3600
+shadowfiend_processor_tolerance_period: 604800
+
+#################
+# Zaqar options
+#################
+enable_zaqar_notification: "yes"
+
+zaqar_port: 8888
+zaqar_listen_port: "{{ zaqar_port }}"
+
+zaqar_smtp_command: "/usr/bin/ustack_sendmail"
+zaqar_require_confirmation: "{{ enable_zaqar_notification | bool}}"
+zaqar_external_confirmation_url: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}/go/api/v1/zaqar/confirm"
+zaqar_subscription_confirmation_email_template: "body:You have chosen to subscribe to the queue: {0}. This queue belongs to project: {1}. To confirm this subscription click or visit this link below: {2},sender:Zaqar Notifications <no-reply@openstack.org>,topic:Confirmation"
+unsubscribe_confirmation_email_template: "body:You have unsubscribed successfully to the queue: {0}. This queue belongs to project: {1}. To resubscribe this subscription,click or visit this link below: {2},sender:Zaqar Notifications <no-reply@openstack.org>,topic:Unsubscribe Confirmation"
+
+zaqar_smtp_hostname: "smtp.163.com"
+zaqar_smtp_port: 0
+zaqar_smtp_username: "tfcloud_noreply"
+zaqar_smtp_password: "SVZKYWWULDNTEAPB"
+zaqar_smtp_secure: True
+zaqar_smtp_sender: "tfcloud_noreply@163.com"
+zaqar_email_corperation_name: "TFCloud Inc."
+zaqar_email_logo_url: "https://www.tfcloud.com/static/assets/logo1.png"
+zaqar_email_home_link: "https://www.tfcloud.com/"
+
+#################
+# Nuntius options
+#################
+enable_nuntius: "{{ enable_ryze | bool}}"
+nuntius_log_level: "INFO"
+nuntius_port: "19096"
+nuntius_use_db: False
+nuntius_alert_field_mapping:
+  instance: "SourceCIName"
+  alertname: "SourceAlertKey"
+  severity_num: "Severity"
+  severity: "SourceSeverity"
+  Alert.Status: "Status"
+  Alert.Annotations.description: "Summary"
+  Alert.StartsAt: "LastOccurrence"
+nuntius_working_mode: "config"
+
+####################
+# Juggernaut options
+####################
+juggernaut_api_port: "9533"
+
+# Telegram
+enable_nuntius_telegram: False
+nuntius_telegram_token: ""
+nuntius_telegram_userid: ""
+
+# DingTalk
+enable_nuntius_dingtalk: False
+nuntius_dingtalk_token: ""
+nuntius_dingtalk_title: ""
+nuntius_dingtalk_phone_numbers: []
+nuntius_dingtalk_isatall: False
+
+# Hl95
+enable_nuntius_hl95: False
+nuntius_hl95_username: "foo"
+nuntius_hl95_password: "bar"
+nuntius_hl95_epid: "666"
+nuntius_hl95_title:
+nuntius_hl95_phone_numbers: []
+
+# Aliyun
+enable_nuntius_aliyun: False
+nuntius_aliyun_region_id: "123456"
+nuntius_aliyun_access_key: "123456"
+nuntius_aliyun_access_key_secret: "123456"
+nuntius_aliyun_sign_name: "123456"
+nuntius_aliyun_template_code: "123456"
+nuntius_aliyun_template_param_key: "123456"
+
+# Rsyslog
+enable_nuntius_rsyslog: False
+syslog_server: "{{ 'api' | kolla_address }}"
+nuntius_rsyslog_address: "{{ syslog_server }}:{{ syslog_udp_port }}"
+nuntius_rsyslog_appname: "nuntius"
+nuntius_rsyslog_protocol: "udp"
+
+# Email
+enable_nuntius_email: False
+nuntius_email_smtpserver: "smtp.163.com:465"
+nuntius_email_smtpuser: "tfcloud_noreply"
+nuntius_email_smtppwd: "SVZKYWWULDNTEAPB"
+nuntius_email_sender: "tfcloud_noreply@163.com"
+nuntius_email_subject: "告警通知"
+nuntius_email_insecureskipverify: False
+
+# YunPian
+enable_nuntius_yunpian: False
+nuntius_yunpian_apikey: ""
+
+# ActiveMQ
+enable_nuntius_activemq: False
+nuntius_activemq_url: "127.0.0.1:61613"
+nuntius_activemq_queue: "eventQueue"
+nuntius_source_id: "nuntius"
+
+########################
+# Monitoring - Hawkeye
+########################
+hawkeye_grafana_purge_database: "no"
+hawkeye_region_name: "{{ openstack_region_name | lower }}"
+
+alertmanager_user: "admin"
+prometheus_user: "admin"
+grafana_admin_username: "admin"
+
+enable_hawkeye: "yes"
+enable_hawkeye_alertmanager: "{{ (enable_hawkeye|bool) and (enable_hawkeye_prometheus|bool) }}"
+enable_hawkeye_blackbox_exporter: "{{ enable_hawkeye | bool }}"
+enable_hawkeye_consul: "no"
+enable_hawkeye_cadvisor: "no"
+enable_hawkeye_grafana: "{{ enable_hawkeye | bool }}"
+enable_hawkeye_node_exporter: "{{ (enable_hawkeye|bool) and (enable_hawkeye_prometheus|bool) }}"
+enable_hawkeye_docker_state_exporter: "{{ enable_hawkeye | bool }}"
+enable_hawkeye_prometheus: "{{ enable_hawkeye | bool }}"
+enable_hawkeye_haproxy_exporter: "{{ (enable_hawkeye|bool) and (enable_haproxy|bool) }}"
+enable_hawkeye_memcached_exporter: "{{ (enable_hawkeye|bool) and (enable_memcached|bool) }}"
+enable_hawkeye_mysqld_exporter: "{{ (enable_hawkeye|bool) and (enable_mariadb|bool) }}"
+enable_hawkeye_openstack_exporter: "{{ enable_hawkeye|bool }}"
+enable_hawkeye_nvidia_gpu_prometheus_exporter: "no"
+enable_hawkeye_rabbitmq_exporter: "{{ (enable_hawkeye|bool) and (enable_rabbitmq|bool) }}"
+enable_hawkeye_redis_exporter: "{{ (enable_hawkeye|bool) and (enable_redis|bool) }}"
+enable_hawkeye_smartctl_exporter: "{{ enable_hawkeye | bool }}"
+enable_hawkeye_keepalived_exporter: "{{ (enable_hawkeye | bool) and (enable_keepalived | bool) }}"
+
+# ports
+hawkeye_alertmanager_port: "19093"
+hawkeye_alertmanager_cluster_port: "19094"
+hawkeye_blackbox_exporter_port: "19115"
+hawkeye_consul_port: "18500"
+hawkeye_cadvisor_port: "19103"
+hawkeye_grafana_port: "13000"
+hawkeye_haproxy_exporter_port: "19101"
+hawkeye_memcached_exporter_port: "19150"
+hawkeye_mysqld_exporter_port: "19104"
+hawkeye_node_exporter_port: "19100"
+hawkeye_openstack_exporter_port: "19198"
+hawkeye_nvidia_gpu_prometheus_exporter_port: "9445"
+hawkeye_prometheus_port: "19090"
+hawkeye_docker_state_exporter_port: "19099"
+hawkeye_redis_exporter_port: "19121"
+hawkeye_rabbitmq_exporter_port: "15692"
+hawkeye_smartctl_exporter_port: "19633"
+hawkeye_keepalived_exporter_port: "19165"
+
+# external ceph mgr promtheus module
+hawkeye_ceph_exporter_addresses: []
+hawkeye_ceph_exporter_port: 9283
+
+####################
+# Firewall Zone
+####################
+firewall_zone: public
+
+##################
+# Iptables options
+##################
+configure_firewall: false
+configure_iptables: false
+iptables_chain: "ustack"
+baremetal_tcp_accept_ports: "{{ baremetal_tcp_accept_default_ports + baremetal_tcp_accept_extra_ports }}"
+baremetal_tcp_accept_default_ports:
+  - "{% if enable_logging | bool %}{{ fluentd_syslog_port }}{% endif %}"
+baremetal_tcp_accept_extra_ports: []
+
+baremetal_udp_accept_ports: "{{ baremetal_udp_accept_default_ports + baremetal_udp_accept_extra_ports }}"
+baremetal_udp_accept_default_ports:
+  # chrony
+  - "123"
+  - "323"
+  # dhcp
+  - "67"
+  # neutron vxlan
+  - "4789"
+baremetal_udp_accept_extra_ports: []
+baremetal_accept_cidrs: "{{ baremetal_accept_default_cidrs + baremetal_accept_extra_cidrs }}"
+baremetal_accept_default_cidrs:
+  - "{% if cluster_network is defined %}{{ cluster_network }}{% endif %}"
+  - "{{ (hostvars[inventory_hostname]['ansible_' + api_interface]['ipv4']['network'] ~ '/' ~ hostvars[inventory_hostname]['ansible_' + api_interface]['ipv4']['netmask']) | ipaddr('net') }}"
+baremetal_accept_extra_cidrs: []
+
+seed_tcp_accept_ports: "{{ seed_tcp_accept_default_ports + seed_tcp_accept_extra_ports }}"
+seed_tcp_accept_default_ports:
+  # bifrost, registry, repository
+  - "7050"
+  - "7385"
+  - "7870"
+  - "{{ docker_registry_port }}"
+  - "{{ repo_port }}"
+seed_tcp_accept_extra_ports: []
+
+seed_udp_accept_ports: "{{ seed_udp_accept_default_ports + seed_udp_accept_extra_ports }}"
+seed_udp_accept_default_ports:
+  - "53"
+  - "67"
+  - "69"
+seed_udp_accept_extra_ports: []
+
+senlin_api_port: 8779
+
+control_tcp_accept_ports: "{{ control_tcp_accept_default_ports + control_tcp_accept_extra_ports }}"
+control_tcp_accept_default_ports:
+  - "{% if enable_aodh | bool %}{{ aodh_api_port }}{% endif %}"
+  - "{% if enable_barbican | bool %}{{ barbican_api_port }}{% endif %}"
+  - "{% if enable_blazar | bool %}{{ blazar_api_port }}{% endif %}"
+  - "{% if enable_cinder | bool %}{{ cinder_api_port }}{% endif %}"
+  - "{% if enable_opensearch | bool %}{{ logging_opensearch_port }}{% endif %}"
+  - "{% if enable_opensearch | bool %}{{ logging_opensearch_transport_port | replace('-', ':') }}{% endif %}"
+  - "{% if enable_etcd | bool %}{{ etcd_client_port }}{% endif %}"
+  - "{% if enable_etcd | bool %}{{ etcd_peer_port }}{% endif %}"
+  - "{% if enable_glance | bool %}{{ glance_api_port }}{% endif %}"
+  - "{% if enable_goering | bool %}{{ goering_api_port }}{% endif %}"
+  - "{% if enable_haproxy | bool %}{{ haproxy_stats_port }}{% endif %}"
+  - "{% if enable_haproxy | bool %}{{ haproxy_monitor_port }}{% endif %}"
+  - "{% if enable_heat | bool %}{{ heat_api_port }}{% endif %}"
+  - "{% if enable_heat | bool %}{{ heat_api_cfn_port }}{% endif %}"
+  - "{% if enable_horizon | bool %}{{ horizon_port }}{% endif %}"
+  - "{% if enable_horizon | bool and kolla_enable_tls_external | bool %}{{ horizon_tls_port }}{% endif %}"
+  - "{% if enable_ironic | bool %}{{ ironic_api_port }}{% endif %}"
+  - "{% if enable_ironic | bool %}{{ ironic_inspector_port }}{% endif %}"
+  - "{% if enable_ironic | bool %}{{ ironic_ipxe_port }}{% endif %}"
+  - "{% if enable_keystone | bool %}{{ keystone_public_port }}{% endif %}"
+  - "{% if enable_keystone | bool %}{{ keystone_admin_port }}{% endif %}"
+  - "{% if enable_keystone | bool %}{{ keystone_ssh_port }}{% endif %}"
+  - "{% if enable_kunkka | bool %}{{ kunkka_port }}{% endif %}"
+  - "{% if enable_kunkka | bool and kolla_enable_tls_external | bool %}{{ kunkka_tls_port }}{% endif %}"
+  - "{% if enable_kunkka | bool %}{{ kunkka_console_port }}{% endif %}"
+  - "{% if enable_kunkka | bool %}{{ kunkka_admin_port }}{% endif %}"
+  - "{% if enable_kunkka | bool %}{{ kunkka_message_port }}{% endif %}"
+  - "{% if enable_ryze | bool %}{{ ryze_port }}{% endif %}"
+  - "{% if enable_lulu | bool %}{{ lulu_port }}{% endif %}"
+  - "{% if enable_malphite | bool %} {{ malphite_port }} {% endif %}"
+  - "{% if enable_manila | bool %}{{ manila_api_port }}{% endif %}"
+  - "{% if enable_mariadb | bool %}{{ mariadb_port }}{% endif %}"
+  - "{% if enable_mariadb | bool %}{{ mariadb_wsrep_port }}{% endif %}"
+  - "{% if enable_mariadb | bool %}{{ mariadb_ist_port }}{% endif %}"
+  - "{% if enable_mariadb | bool %}{{ mariadb_sst_port }}{% endif %}"
+  - "{% if enable_mariadb | bool %}{{ mariadb_pcs_control_port }}{% endif %}"
+  - "{% if enable_masakari | bool %}{{ masakari_api_port }}{% endif %}"
+  - "{% if enable_mistral | bool %}{{ mistral_api_port }}{% endif %}"
+  - "{% if enable_neutron | bool %}{{ neutron_server_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_api_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_metadata_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_novncproxy_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_spicehtml5proxy_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_serialproxy_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ placement_api_port }}{% endif %}"
+  - "{% if enable_nuntius | bool %}{{ nuntius_port }}{% endif %}"
+  - "{% if enable_octavia | bool %}{{ octavia_api_port }}{% endif %}"
+  - "{% if enable_octavia | bool %}{{ octavia_health_manager_port }}{% endif %}"
+  - "{% if enable_panko | bool %}{{ panko_api_port }}{% endif %}"
+  - "{% if enable_porsche | bool %}{{ porsche_api_port }}{% endif %}"
+  - "{% if enable_rabbitmq | bool %}{{ rabbitmq_port }}{% endif %}"
+  - "{% if enable_rabbitmq | bool %}{{ rabbitmq_management_port }}{% endif %}"
+  - "{% if enable_rabbitmq | bool %}{{ rabbitmq_cluster_port }}{% endif %}"
+  - "{% if enable_rabbitmq | bool %}{{ rabbitmq_epmd_port }}{% endif %}"
+  - "{% if enable_rabbitmq | bool %}{{ rabbitmq_pcs_control_port }}{% endif %}"
+  - "{% if enable_redis | bool %}{{ redis_port }}{% endif %}"
+  - "{% if enable_redis | bool %}{{ redis_sentinel_port }}{% endif %}"
+  - "{% if enable_senlin | bool %}{{ senlin_api_port }}{% endif %}"
+  - "{% if enable_shadowfiend | bool %}{{ shadowfiend_api_port }}{% endif %}"
+  - "{% if enable_prometheus_pushgateway | bool %}{{ prometheus_pushgateway_port }}{% endif %}"
+  - "{% if enable_prometheus_proxy | bool %}{{ prometheus_proxy_port }}{% endif %}"
+  - "{% if enable_zaqar | bool %}{{ zaqar_port }}{% endif %}"
+  - "{% if enable_juggernaut | bool %}{{ juggernaut_api_port }}{% endif %}"
+  - "{% if enable_furion | bool %}{{ furion_server_port }}{% endif %}"
+control_tcp_accept_extra_ports: []
+
+nova_libvirt_port: "16509"
+nova_ssh_port: "8022"
+nova_reclaim_instance_interval: "0"
+nova_reserved_host_memory_mb: "{{ 32768 if inventory_hostname in groups['ceph'] else 16384 }}"
+compute_tcp_accept_ports: "{{ compute_tcp_accept_default_ports + compute_tcp_accept_extra_ports }}"
+compute_tcp_accept_default_ports:
+  - "{% if enable_nova | bool %}{{ nova_libvirt_port }}{% endif %}"
+  - "{% if enable_nova | bool %}{{ nova_ssh_port }}{% endif %}"
+  - "{% if enable_nova | bool %}5900:6900{% endif %}"
+  - "{% if enable_nova | bool %}49152:49215{% endif %}"
+compute_tcp_accept_extra_ports: []
+
+hawkeye_tcp_accept_ports: "{{ hawkeye_tcp_accept_default_ports + hawkeye_tcp_accept_extra_ports }}"
+hawkeye_tcp_accept_default_ports:
+  - "{% if enable_hawkeye_alertmanager | bool %}{{ hawkeye_alertmanager_port }}{% endif %}"
+  - "{% if enable_hawkeye_alertmanager | bool %}{{ hawkeye_alertmanager_cluster_port }}{% endif %}"
+  - "{% if enable_hawkeye_blackbox_exporter | bool %}{{ hawkeye_blackbox_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_cadvisor | bool %}{{ hawkeye_cadvisor_port }}{% endif %}"
+  - "{% if enable_hawkeye_consul | bool %}{{ hawkeye_consul_port }}{% endif %}"
+  - "{% if enable_hawkeye_grafana | bool %}{{ hawkeye_grafana_port }}{% endif %}"
+  - "{% if enable_hawkeye_haproxy_exporter | bool %}{{ hawkeye_haproxy_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_memcached_exporter | bool %}{{ hawkeye_memcached_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_mysqld_exporter | bool %}{{ hawkeye_mysqld_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_node_exporter | bool %}{{ hawkeye_node_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_openstack_exporter | bool %}{{ openstack_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_prometheus | bool %}{{ hawkeye_prometheus_port }}{% endif %}"
+  - "{% if enable_hawkeye_rabbitmq | bool %}{{ hawkeye_rabbitmq_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_redis_exporter | bool %}{{ hawkeye_redis_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_smartctl_exporter | bool %}{{ hawkeye_smartctl_exporter_port }}{% endif %}"
+  - "{% if enable_hawkeye_keepalived_exporter | bool %}{{ hawkeye_keepalived_exporter_port }}{% endif %}"
+  - "{{ hawkeye_ceph_exporter_port }}"
+hawkeye_tcp_accept_extra_ports: []
+
+logging_tcp_accept_ports: "{{ logging_tcp_accept_default_ports + logging_tcp_accept_extra_ports }}"
+logging_tcp_accept_default_ports:
+  - "{% if enable_logging | bool %}{{ logging_opensearch_port }}{% endif %}"
+  - "{% if enable_logging | bool %}{{ logging_opensearch_transport_port | replace('-', ':') }}{% endif %}"
+  - "{% if enable_logging | bool %}{{ logging_opensearch_dashboards_port }}{% endif %}"
+logging_tcp_accept_extra_ports: []
+
+####################
+# Horizon options
+####################
+horizon_port: "{% if not enable_kunkka|bool %}80{% else %}5690{% endif %}"
+horizon_tls_port: "{% if not enable_kunkka|bool %}443{% else %}15690{% endif %}"
+
+####################
+# Keepalived options
+####################
+keepalived_extra_volumes:
+  - "keepalived_data:/tmp/"
+
+####################
+# Malphite options
+####################
+malphite_port: 9096
+
+malphite_ticket_assignees:
+  - "admin"
+malphite_auto_dispacth_mode: "role_based"
+
+########################
+# Object Store options
+########################
+s3_proxy_server_port: "8080"
+
+####################
+# Captain options
+####################
+captain_port: "5685"
+
+####################
+# Kunkka options
+####################
+kunkka_port: "80"
+kunkka_tls_port: "443"
+kunkka_admin_port: "5677"
+kunkka_console_port: "5678"
+kunkka_message_port: "5679"
+
+kunkka_database_address: "{{ database_address }}"
+kunkka_database_admin_user: "{{ database_user }}"
+kunkka_database_port: "{{ database_port }}"
+kunkka_database_user: "kunkka"
+kunkka_database_name: "kunkka"
+
+enable_kunkka_external_redis: false
+kunkka_external_redis_host:
+kunkka_external_redis_port:
+kunkka_external_redis_password:
+kunkka_redis_db: 3
+
+# Kunkaa Websocket is used to notify messages
+enable_kunkka_ws: "{{ enable_kunkka | bool }}"
+
+# FIXME: think about "openstack" exchange always existed when enable_ceilomter
+# However, if ceilometer is disabled, consider notification should disable also and does not configure
+# "openstack" exchange leads to kunkka missing event, which may not be quite reasonable.
+kunkka_notification_topics:
+  - name: nova
+    enabled: "{{ enable_nova | bool and enable_ceilometer | bool }}"
+  - name: cinder
+    enabled: "{{ enable_cinder | bool and enable_ceilometer | bool }}"
+  - name: neutron
+    enabled: "{{ enable_neutron | bool and enable_ceilometer | bool }}"
+  - name: glance
+    enabled: "{{ enable_glance | bool and enable_ceilometer | bool }}"
+  - name: keystone
+    enabled: "{{ enable_keystone | bool and enable_ceilometer | bool }}"
+  - name: designate
+    enabled: "{{ enable_designate | bool and enable_ceilometer | bool }}"
+  - name: ironic
+    enabled: "{{ enable_ironic | bool and enable_ceilometer | bool }}"
+  - name: heat
+    enabled: "{{ enable_heat | bool and enable_ceilometer | bool }}"
+  - name: senlin
+    enabled: "{{ enable_senlin | bool and enable_ceilometer | bool }}"
+  - name: openstack
+    enabled: "{{ enable_ceilometer | bool }}"
+kunkka_enabled_notification_topics: "{{ kunkka_notification_topics | selectattr('enabled', 'equalto', true) | list }}"
+
+kunkka_ticket_enabled: "no"
+# s3 or swift
+kunkka_ticket_storage_type: "s3"
+kunkka_ticket_storage_region: "{{ openstack_region_name }}"
+kunkka_ticket_storage_bucket: "ticket"
+kunkka_ticket_flow_roles:
+  - member
+  - admin
+
+kunkka_admin_email: "example@unitedstack.com"
+
+kunkka_logo:
+  # 通用 logo，用在登录、注册、关于产品页面
+  generic: "logo.png"
+  # 导航栏 logo
+  navbar: "nav_logo.png"
+  # 浏览器 tab 图标，根据需要才修改
+  favicon: "favicon.ico"
+  # 用户背景图片
+  background: "auth-bg.png"
+# 邮件中的 logo，需要在公网能访问到
+kunkka_email_logo: 'https://www.tfcloud.com/static/assets/logo1.png'
+kunkka_login_online_limit: 5
+
+undercloud_prometheus_url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ hawkeye_prometheus_port }}"
+overcloud_promtheus_url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ prometheus_port }}"
+undercloud_grafana_url: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ hawkeye_grafana_port }}"
+captain_url: "http://{{ bifrost_network_interface_address }}:{{ captain_port }}"
+admin_guide_url: "http://{{ kolla_external_fqdn }}:5800/admin"
+user_guide_url: "http://{{ kolla_external_fqdn }}:5800/user"
+
+kunkka_urls:
+  undercloud_prometheus:
+    url: '{{ undercloud_prometheus_url }}'
+    username: '{{ prometheus_user }}'
+    password: '{{ prometheus_password }}'
+  overcloud_prometheus:
+    url: '{{ overcloud_promtheus_url }}'
+    username: '{{ prometheus_user }}'
+    password: '{{ prometheus_password }}'
+  undercloud_grafana:
+    url: '{{ undercloud_grafana_url }}'
+    username: '{{ grafana_admin_username }}'
+    password: '{{ grafana_admin_password }}'
+  captain: "{{ captain_url }}"
+  admin_guide_doc: "{{ admin_guide_url }}"
+  user_guide_doc: "{{ user_guide_url }}"
+
+####################
+# Ryze options
+####################
+ryze_port: "{% if not enable_horizon|bool and not enable_kunkka|bool %}80{% else %}5677{% endif %}"
+ryze_listen_port: "{{ ryze_port }}"
+ryze_logo:
+  # 通用 logo，用在登录、注册、关于产品页面
+  generic: "logo.png"
+  # 导航栏 logo
+  navbar: "nav_logo.png"
+  # 浏览器 tab 图标，根据需要才修改
+  favicon: "favicon.ico"
+# 邮件中的 logo，需要在公网能访问到
+ryze_email_logo: 'https://www.tfcloud.com/static/assets/logo1.png'
+
+####################
+# Lulu options
+####################
+lulu_port: "5700"
+lulu_listen_port: "{{ lulu_port }}"
+
+#####################
+# Cloudkitty options
+#####################
+enable_cloudkitty_prometheus_collector: "{{ enable_prometheus | bool }}"
+enable_cloudkitty_opensearch_backend: false
+enable_cloudkitty_mysql_backend: "{{ enable_mariadb | bool }}"
+
+##################
+# Neutron options
+##################
+# Default option is 'physnet1:1:1000', please change the option as your environment.
+neutron_network_vlan_ranges: "physnet1:1:4094"
+neutron_physical_network_mtus: "physnet1:1500"
+
+#####################
+# Prometheus options
+#####################
+enable_prometheus: "{{ enable_ceilometer }}"
+enable_prometheus_pushgateway: "{{ enable_prometheus }}"
+enable_prometheus_pushgateway_housekeeping: "{{ enable_prometheus_pushgateway }}"
+enable_prometheus_proxy: "{{ enable_prometheus }}"
+
+prometheus_pushgateway_port: "19092"
+prometheus_proxy_port: 12306
+
+prometheus_pushgateway_housekeeping_log_level: "INFO"
+prometheus_pushgateway_housekeeping_period: "30m"
+prometheus_pushgateway_housekeeping_retention_time: "5m"
+
+#################
+# Ceph options
+#################
+
+osd_memory_target: "4G"
+
+# OpenStack Pool and Keys
+openstack_glance_pool:
+  name: "{{ ceph_glance_pool_name }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 32
+  pgp_num: 32
+openstack_cinder_pool:
+  name: "{{ cinder_generic_backend_pool }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 64
+  pgp_num: 64
+openstack_nova_pool:
+  name: "{{ ceph_nova_pool_name }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 32
+  pgp_num: 32
+openstack_cinder_backup_pool:
+  name: "backups"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 32
+  pgp_num: 32
+openstack_cinder_ssd_pool:
+  name: "{{ cinder_ssd_backend_pool }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 64
+  pgp_num: 64
+openstack_cinder_hdd_pool:
+  name: "{{ cinder_hdd_backend_pool }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 64
+  pgp_num: 64
+openstack_cinder_hybrid_pool:
+  name: "{{ cinder_hybrid_backend_pool }}"
+  application: "rbd"
+  pg_autoscale_mode: "off"
+  pg_num: 64
+  pgp_num: 64
+empty_list:
+  - ""
+uos_openstack_pools:
+  - "{{ openstack_glance_pool }}"
+  - "{% if enable_cinder_generic_backend | bool %}{{ openstack_cinder_pool }}{% endif %}"
+  - "{% if ceph_nova_pool_name != ceph_glance_pool_name %}{{ openstack_nova_pool }}{% endif %}"
+  - "{% if enable_cinder_backup | bool and cinder_backup_driver == 'ceph' %}{{ openstack_cinder_backup_pool }}{% endif %}"
+  - "{% if enable_cinder_ssd_backend | bool %}{{ openstack_cinder_ssd_pool }}{% endif %}"
+  - "{% if enable_cinder_hdd_backend | bool %}{{ openstack_cinder_hdd_pool }}{% endif %}"
+  - "{% if enable_cinder_hybrid_backend | bool %}{{ openstack_cinder_hybrid_pool }}{% endif %}"
+openstack_pools: "{{ uos_openstack_pools | difference(empty_list) }}"
+
+openstack_keys:
+  - { name: client.glance, caps: { mon: "profile rbd", osd: "profile rbd"}, mode: "0600" }
+  - { name: client.cinder, caps: { mon: "profile rbd", osd: "profile rbd"}, mode: "0600" }
+  - { name: client.nova, caps: { mon: "profile rbd", osd: "profile rbd"}, mode: "0600" }
+  - { name: client.manila, caps: { mon: "allow r, allow command 'auth del', allow command 'auth caps', allow command 'auth get', allow command 'auth get-or-create'", osd: "allow rw", mds: "allow *", mgr: "allow rw"}, mode: "0600", }
+
+# 为获取到Barbican服务的所有secret，增加了kms3party_integrator user和kms_3party_integration_admin role.
+barbican_3party_integration_user: kms_3party_integrator
+barbican_3party_integration_role: kms_3party_integration_admin
+
+# Ceph keystone 集成用户
+ceph_rgw_keystone_user: ceph
+
+# Ceph rgw
+ceph_rgw_realm: tfcloud
+ceph_rgw_zonegroup: cn
+ceph_rgw_zone: cn-1
+
+################
+# Kolla options
+################
+
+# Action: Gather fact still need this
+kolla_action: "{{ maine_action }}"
+
+# Networking
+api_interface: "eth1.2005"
+tunnel_interface: "eth1.2007"
+network_interface: "eth1.2006"
+neutron_bridge_name: "br-ex"
+neutron_external_interface: "eth1"
+
+kolla_internal_vip_address: "10.0.5.30"
+kolla_external_vip_address: "10.0.6.30"
+
+ceph_rgw_external_vip_address: "10.0.6.20"
+ceph_nfs_external_vip_address: "10.0.6.10"
+
+ceph_rgw_external_fqdn: "{{ ceph_rgw_external_vip_address }}"
+ceph_nfs_external_fqdn: "{{ ceph_nfs_external_vip_address }}"
+
+# Optimization
+enable_optimization: "yes"
+
+# Infra components
+enable_chrony: "yes"
+enable_etcd: "no"
+enable_fluentd: "no"
+enable_central_logging: "no"
+enable_redis: "yes"
+enable_openvswitch: "no"
+
+# Service components
+enable_aodh: "yes"
+enable_ceilometer: "yes"
+enable_cinder: "yes"
+enable_cloudkitty: "no"
+enable_gnocchi: "no"
+enable_horizon: "no"
+enable_ironic: "no"
+enable_manila: "no"
+enable_mistral: "yes"
+enable_octavia: "no"
+enable_panko: "yes"
+
+enable_neutron_vpnaas: "yes"
+enable_neutron_fwaas: "yes"
+enable_neutron_lbaas: "no"
+enable_neutron_qos: "yes"
+enable_neutron_agent_ha: "yes"
+enable_neutron_segments: "yes"
+glance_backend_ceph: "yes"
+cinder_backend_ceph: "yes"
+nova_backend_ceph: "yes"
+cinder_backup_driver: "ceph"
+enable_manila_backend_cephfs_native: "yes"
+enable_manila_backend_cephfs_nfs: "no"
+computes_need_external_bridge: "yes"
+cephfs_enable_snapshots: "yes"
+enable_external_haproxy_stats: "yes"
+enable_external_rabbitmq_management: "yes"
+
+enable_ironic_ipxe: "yes"
+enable_ironic_pxe_uefi: "yes"
+
+# OpenStack Upgrading Strategy
+glance_enable_rolling_upgrade: "no"
+ironic_enable_rolling_upgrade: "no"
+neutron_enable_rolling_upgrade: "no"
+
+# Mariadb backup
+enable_mariabackup: "yes"
+
+# aggresively upgrade unstable component to train release
+
+# containers ulimits
+# Related-Bug: #1760471
+# Closes-bug: #1824020
+# Related-Bug: #1757556
+# Referance: https://github.com/openstack/tripleo-heat-templates
+cinder_volume_dimensions:
+  ulimits:
+    nofile:
+      soft: 131072
+      hard: 131072
+nova_compute_dimensions:
+  ulimits:
+    nofile:
+      soft: 131072
+      hard: 131072
+mistral_executor_dimensions:
+  ulimits:
+    nofile:
+      soft: 1024
+      hard: 1024
+neutron_dhcp_agent_dimensions:
+  ulimits:
+    nofile:
+      soft: 16384
+      hard: 16384
+neutron_l3_agent_dimensions:
+  ulimits:
+    nofile:
+      soft: 16384
+      hard: 16384
+neutron_sriov_agent_dimensions:
+  ulimits:
+    nofile:
+      soft: 16384
+      hard: 16384
+neutron_openvswitch_agent_dimensions:
+  ulimits:
+    nofile:
+      soft: 16384
+      hard: 16384
+
+openstack_service_workers: 1
+openstack_mandatory_service_workers: "{{ [openstack_service_workers, 2] | max }}"
+openstack_service_rpc_workers: "{{ openstack_service_workers }}"
+haproxy_max_connections: 20480
+
+# Neutron
+ustack_service_plugins:
+  - name: "network_segment_range"
+    enabled: "{{ enable_neutron_segments|default('no') | bool }}"
+  - name: "uplugin"
+    enabled: "{{ enable_neutron_uplugin_agent|default('no') | bool }}"
+
+neutron_service_plugins: "{{ (service_plugins+ustack_service_plugins) | selectattr('enabled', 'equalto', true) | list }}"
+
+ustack_l3_agent_extensions:
+  - name: "fip_qos"
+    enabled: "{{ enable_neutron_qos | bool }}"
+neutron_l3_agent_extensions: "{{ (l3_agent_extensions+ustack_l3_agent_extensions) | selectattr('enabled', 'equalto', true) | list }}"
+
+dhcp_agents_per_network: 3
+neutron_fwaas_version: "v2"
+
+neutron_global_physnet_mtu: 9000
+neutron_ml2_path_mtu: 1550
+neutron_ml2_firewall_driver: "openvswitch"
+neutron_dnsmasq_dns_servers: "119.29.29.29,114.114.114.114"
+
+# Ceph integration
+
+# Because kolla hardcodes, it is not recommended to modify it here.
+ceph_cinder_user_name: "cinder"
+ceph_glance_user_name: "glance"
+ceph_manila_user_name: "manila"
+ceph_nova_user_name: "nova"
+
+cinder_hdd_backend_pool: "hdd-volumes"
+cinder_hdd_backend_name: "hdd"
+cinder_ssd_backend_pool: "ssd-volumes"
+cinder_ssd_backend_name: "ssd"
+cinder_hybrid_backend_pool: "hybrid-volumes"
+cinder_hybrid_backend_name: "hybrid"
+cinder_generic_backend_pool: "volumes"
+cinder_generic_backend_name: "generic"
+enable_cinder_hdd_backend: "no"
+enable_cinder_ssd_backend: "no"
+enable_cinder_hybrid_backend: "no"
+enable_cinder_generic_backend: "yes"
+
+ceph_glance_user: "{{ ceph_glance_user_name }}"
+ceph_glance_pool_name: "images"
+ceph_cinder_backup_pool_name: "backups"
+# Note(Yao Ning): vms pool is rarely used because of bfv is used by default
+# therefore reuse images pool for bfi instance
+ceph_nova_pool_name: "{{ ceph_glance_pool_name }}"
+
+# Octavia
+octavia_loadbalancer_topology: "ACTIVE_STANDBY"
+octavia_amp_arch: "x86_64"
+octavia_amp_image: "http://repo.ustack.com/production/ustack-images/wallaby/octavia-images/amphora-x64-haproxy.raw"
+octavia_flavor_hygon: "false"
+octavia_flavor_hygon_cpu_model: "Hygon C86 7280 32-core Processor"
+amphora_administrative_log_facility: "3"
+amphora_user_log_facility: "4"
+syslog_amphora_administrative_log_facility: "local{{ amphora_administrative_log_facility }}"
+syslog_amphora_user_log_facility: "local{{ amphora_user_log_facility }}"
+enable_amphora_log: "{{ enable_octavia | bool }}"
+enable_amphora_admin_log: "{{ enable_amphora_log }}"
+enable_amphora_all_admin_log: "{{ enable_amphora_log }}"
+enable_amphora_user_log: "{{ enable_amphora_log }}"
+
+octavia_certs_server_ca_expiry: 36500
+octavia_certs_client_ca_expiry: 36500
+octavia_certs_client_expiry: 36500
+
+octavia_network_type: "tenant"
+octavia_amp_network_cidr: 240.0.0.0/16
+
+# manila
+manila_share_extra_volumes:
+  - "{{ '/etc/ganesha/export.d:/etc/ganesha/export.d' if enable_manila_backend_cephfs_nfs | bool else '' }}"
+
+# hacluster
+hacluster_pacemaker_extra_volumes:
+  - "/run:/run:shared"
+
+#####################
+# Mariadb options
+#####################
+dynamic_pool_size_mb: 1024
+mariadb_pcs_control_port: 3123
+
+#####################
+# Logging options
+#####################
+logging_opensearch_port: "19200"
+logging_opensearch_dashboards_port: "5601"
+logging_opensearch_transport_port: 19300-19400
+logging_opensearch_dashboards_port_external: "{{ logging_opensearch_dashboards_port }}"
+
+logging_opensearch_cluster_name: "logging"
+logging_opensearch_address: "{{ kolla_internal_fqdn }}"
+
+logging_opensearch_datadir_volume: "logging_opensearch"
+logging_opensearch_internal_endpoint: "{{ internal_protocol }}://{{ logging_opensearch_address | put_address_in_context('url') }}:{{ logging_opensearch_port }}"
+
+logging_opensearch_log_index_prefix: "flog"
+logging_opensearch_dashboards_log_prefix: "flog"
+
+#####################
+# Redis options
+#####################
+zaqar_redis_uri: "redis://{{ redis_master_password }}@{% for host in groups['redis'] %}{{ 'api' | kolla_address(host) | put_address_in_context('url') }}:{{ redis_sentinel_port }}{% if not loop.last %},{% endif %}{% endfor %}?master=kolla&dbid=0&socket_timeout=60&retry_on_timeout=yes"
+
+#######################
+# Cloudkitty options
+#######################
+cloudkitty_storage_backend: sqlalchemy
+
+####################
+# Cyborg options
+####################
+cyborg_services:
+  cyborg-api:
+    container_name: cyborg_api
+    group: cyborg-api
+    enabled: true
+    image: "{{ cyborg_api_image_full }}"
+    volumes: "{{ cyborg_api_default_volumes + cyborg_api_extra_volumes }}"
+    dimensions: "{{ cyborg_api_dimensions }}"
+    healthcheck: "{{ cyborg_api_healthcheck }}"
+    haproxy:
+      cyborg_api:
+        enabled: "{{ enable_cyborg  }}"
+        mode: "http"
+        external: false
+        port: "{{ cyborg_api_port }}"
+        listen_port: "{{ cyborg_api_port }}"
+  cyborg-agent:
+    container_name: cyborg_agent
+    group: cyborg-agent
+    enabled: true
+    privileged: true
+    image: "{{ cyborg_agent_image_full }}"
+    volumes: "{{ cyborg_agent_default_volumes + cyborg_agent_extra_volumes }}"
+    dimensions: "{{ cyborg_agent_dimensions }}"
+    healthcheck: "{{ cyborg_agent_healthcheck }}"
+  cyborg-conductor:
+    container_name: cyborg_conductor
+    group: cyborg-conductor
+    enabled: true
+    image: "{{ cyborg_conductor_image_full }}"
+    volumes: "{{ cyborg_conductor_default_volumes + cyborg_conductor_extra_volumes }}"
+    dimensions: "{{ cyborg_conductor_dimensions }}"
+    healthcheck: "{{ cyborg_conductor_healthcheck }}"
+
+cyborg_ks_services:
+  - name: "cyborg"
+    type: "accelerator"
+    description: "OpenStack Acceleration Service"
+    endpoints:
+      - {'interface': 'internal', 'url': '{{ cyborg_internal_endpoint }}'}
+
+#######################
+# kolla toolbox options
+#######################
+kolla_toolbox_extra_volumes:
+  - "/lib/modules:/lib/modules:ro"
+  - "{{ '/etc/sysconfig/network-scripts/:/etc/sysconfig/network-scripts/' if (ansible_distribution.split(' ')[0] != 'Uniontech') else '' }}"
+  - "{{ '/etc/sysconfig/network:/etc/sysconfig/network' if (ansible_distribution.split(' ')[0] != 'Uniontech') else '' }}"
+
+#######################
+# nova options
+#######################
+enable_nova_serialconsole_proxy: "{{ enable_ironic | bool }}"
+
+#######################
+# glance options
+######################
+glance_conversion_format: "raw"
+# NOTE(Xing Zhang): Remove cinder and swift backend from this list,
+# override in globals if needed.
+glance_backends:
+  - name: file
+    type: file
+    enabled: "{{ glance_backend_file | bool }}"
+  - name: http
+    type: http
+    enabled: true
+  - name: rbd
+    type: rbd
+    enabled: "{{ glance_backend_ceph | bool }}"
+  - name: vmware
+    type: vmware
+    enabled: "{{ glance_backend_vmware | bool }}"
+
+#######################
+# ironic options
+#######################
+ironic_dnsmasq_interface: "{{ api_interface }}"
+ironic_dnsmasq_interface_address: "{{ 'ironic_dnsmasq' | kolla_address }}"
+ironic_dnsmasq_address_family: "{{ api_address_family }}"
+
+ironic_dhcp_addr_start_default: 200
+ironic_dhcp_addr_end_default: 249
+ironic_dnsmasq_dhcp_start: "{{ ironic_dnsmasq_interface_address | regex_replace('(^.*\\.).*$', '\\1') }}{{ ironic_dhcp_addr_start_default }}"
+ironic_dnsmasq_dhcp_end: "{{ ironic_dnsmasq_interface_address | regex_replace('(^.*\\.).*$', '\\1') }}{{ ironic_dhcp_addr_end_default }}"
+ironic_dnsmasq_dhcp_lease: "2h"
+ironic_dnsmasq_dhcp_range: "{{ ironic_dnsmasq_dhcp_start }},{{ ironic_dnsmasq_dhcp_end }},{{ ironic_dnsmasq_dhcp_lease }}"
+
+# Note:(Yao Ning) ironic dnsmasq driver need to mount this volume
+ironic_conductor_extra_volumes:
+  - "ironic_inspector_dhcp_hosts:/etc/dnsmasq.d/hostsdir.d"
+  - "ironic_dnsmasq:/var/lib/dnsmasq:ro"
+
+# Note:(Yao Ning) conductor need dnsmasq.lease file in dnsmasq
+ironic_dnsmasq_extra_volumes:
+  - "ironic_dnsmasq:/var/lib/dnsmasq"
+
+ironic_image_folder: "/opt/ironic_images"
+
+###################################
+# pushgateway-housekeeping options
+###################################
+pushgateway_housekeeping_log_level: "INFO"
+pushgateway_housekeeping_period: "30m"
+pushgateway_housekeeping_retention_time: "5m"
+
+#######################
+# aodh options
+######################
+aodh_evaluation_interval: 60
+
+###########################
+# designate backend options
+###########################
+designate_backend: "pdns4"
+designate_backend_external_pdns4_nameservers: ""
+
+#######################
+# docker images
+#######################
+hacluster_corosync_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hacluster-corosync"
+hacluster_pacemaker_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hacluster-pacemaker"
+hacluster_pacemaker_remote_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/hacluster-pacemaker-remote"
+multipathd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/multipathd"
+tempest_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/tempest"
+prometheus_haproxy_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-haproxy-exporter"
+prometheus_mysqld_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-mysqld-exporter"
+prometheus_node_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-node-exporter"
+prometheus_memcached_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-memcached-exporter"
+prometheus_cadvisor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-cadvisor"
+prometheus_alertmanager_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-alertmanager"
+prometheus_openstack_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-openstack-exporter"
+prometheus_elasticsearch_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-elasticsearch-exporter"
+prometheus_blackbox_exporter_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/prometheus-blackbox-exporter"
+trove_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/trove-conductor"
+trove_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/trove-api"
+trove_taskmanager_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/trove-taskmanager"
+keepalived_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/keepalived"
+haproxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/haproxy"
+mariadb_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mariadb-server"
+mariadb_clustercheck_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mariadb-clustercheck"
+mariabackup_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mariadb-server"
+barbican_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/barbican-api"
+barbican_keystone_listener_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/barbican-keystone-listener"
+barbican_worker_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/barbican-worker"
+aodh_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/aodh-api"
+aodh_evaluator_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/aodh-evaluator"
+aodh_listener_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/aodh-listener"
+aodh_notifier_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/aodh-notifier"
+nova_super_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-conductor"
+nova_scheduler_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-scheduler"
+nova_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-api"
+nova_libvirt_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-libvirt"
+nova_ssh_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-ssh"
+nova_novncproxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-novncproxy"
+nova_spicehtml5proxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-spicehtml5proxy"
+nova_serialproxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-serialproxy"
+nova_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-conductor"
+nova_compute_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-compute"
+nova_compute_ironic_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/nova-compute-ironic"
+vmtp_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vmtp"
+heat_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/heat-api"
+heat_api_cfn_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/heat-api-cfn"
+heat_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/heat-engine"
+cloudkitty_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cloudkitty-api"
+cloudkitty_processor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cloudkitty-processor"
+iscsid_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/iscsid"
+tgtd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/tgtd"
+solum_worker_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/solum-worker"
+solum_deployer_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/solum-deployer"
+solum_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/solum-conductor"
+solum_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/solum-api"
+skydive_analyzer_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/skydive-analyzer"
+skydive_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/skydive-agent"
+horizon_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/horizon"
+gnocchi_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/gnocchi-api"
+gnocchi_statsd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/gnocchi-statsd"
+gnocchi_metricd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/gnocchi-metricd"
+designate_central_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-central"
+designate_producer_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-producer"
+designate_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-api"
+designate_backend_bind9_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-backend-bind9"
+designate_mdns_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-mdns"
+designate_sink_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-sink"
+designate_worker_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/designate-worker"
+glance_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/glance-api"
+glance_tls_proxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/haproxy"
+kolla_toolbox_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/kolla-toolbox"
+kafka_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/kafka"
+manila_share_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/manila-share"
+manila_scheduler_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/manila-scheduler"
+manila_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/manila-api"
+manila_data_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/manila-data"
+tacker_server_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/tacker-server"
+tacker_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/tacker-conductor"
+qdrouterd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/qdrouterd"
+telegraf_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/telegraf"
+senlin_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/senlin-conductor"
+senlin_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/senlin-engine"
+senlin_health_manager_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/senlin-health-manager"
+senlin_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/senlin-api"
+freezer_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/freezer-api"
+freezer_scheduler_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/freezer-scheduler"
+watcher_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/watcher-engine"
+watcher_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/watcher-api"
+watcher_applier_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/watcher-applier"
+magnum_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/magnum-api"
+magnum_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/magnum-conductor"
+vitrage_graph_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vitrage-graph"
+vitrage_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vitrage-api"
+vitrage_notifier_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vitrage-notifier"
+vitrage_ml_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vitrage-ml"
+vitrage_persistor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/vitrage-persistor"
+kuryr_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/kuryr-libnetwork"
+storm_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/storm"
+swift_proxy_server_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-proxy-server"
+swift_account_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-account"
+swift_container_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-container"
+swift_object_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-object"
+swift_object_expirer_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-object-expirer"
+swift_rsyncd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/swift-rsyncd"
+octavia_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/octavia-api"
+octavia_driver_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/octavia-driver-agent"
+octavia_health_manager_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/octavia-health-manager"
+octavia_housekeeping_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/octavia-housekeeping"
+octavia_worker_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/octavia-worker"
+keystone_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/keystone"
+keystone_fernet_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/keystone-fernet"
+keystone_ssh_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/keystone-ssh"
+cinder_volume_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cinder-volume"
+cinder_scheduler_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cinder-scheduler"
+cinder_backup_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cinder-backup"
+cinder_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cinder-api"
+influxdb_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/influxdb"
+etcd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/etcd"
+zun_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zun-api"
+zun_wsproxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zun-wsproxy"
+zun_compute_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zun-compute"
+zun_cni_daemon_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zun-cni-daemon"
+redis_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/redis"
+redis_sentinel_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/redis-sentinel"
+monasca_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-agent"
+monasca_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-api"
+monasca_logstash_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/logstash"
+monasca_thresh_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-thresh"
+monasca_notification_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-notification"
+monasca_persister_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-persister"
+monasca_grafana_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/monasca-grafana"
+rally_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/rally"
+ovsdpdk_db_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovsdpdk-db"
+ovsdpdk_vswitchd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovsdpdk-vswitchd"
+rabbitmq_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/rabbitmq"
+placement_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/placement-api"
+ceilometer_notification_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ceilometer-notification"
+ceilometer_central_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ceilometer-central"
+ceilometer_compute_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ceilometer-compute"
+ceilometer_ipmi_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ceilometer-ipmi"
+zookeeper_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/zookeeper"
+cyborg_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cyborg-api"
+cyborg_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cyborg-agent"
+cyborg_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cyborg-conductor"
+memcached_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/memcached"
+openvswitch_db_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/openvswitch-db-server"
+openvswitch_vswitchd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/openvswitch-vswitchd"
+masakari_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/masakari-api"
+masakari_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/masakari-engine"
+masakari_monitors_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/masakari-monitors"
+mistral_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mistral-engine"
+mistral_event_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mistral-event-engine"
+mistral_executor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mistral-executor"
+mistral_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/mistral-api"
+murano_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/murano-api"
+murano_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/murano-engine"
+sahara_engine_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/sahara-engine"
+sahara_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/sahara-api"
+ironic_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ironic-api"
+ironic_conductor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ironic-conductor"
+ironic_pxe_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ironic-pxe"
+ironic_inspector_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ironic-inspector"
+ironic_dnsmasq_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/dnsmasq"
+ovn_controller_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovn-controller"
+ovn_northd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovn-northd"
+ovn_nb_db_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovn-nb-db-server"
+ovn_sb_db_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ovn-sb-db-server"
+neutron_dhcp_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-dhcp-agent"
+neutron_l3_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-l3-agent"
+neutron_sriov_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-sriov-agent"
+neutron_mlnx_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-mlnx-agent"
+neutron_eswitchd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-mlnx-agent"
+neutron_linuxbridge_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-linuxbridge-agent"
+neutron_metadata_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-metadata-agent"
+neutron_ovn_metadata_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-metadata-agent"
+neutron_openvswitch_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-openvswitch-agent"
+neutron_server_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-server"
+neutron_bgp_dragent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-bgp-dragent"
+neutron_infoblox_ipam_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-infoblox-ipam-agent"
+neutron_metering_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/neutron-metering-agent"
+ironic_neutron_agent_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/ironic-neutron-agent"
+neutron_tls_proxy_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/haproxy"
+chrony_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/chrony"
+collectd_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/collectd"
+panko_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/panko-api"
+cron_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/cron"
+
+######################
+# common options
+######################
+
+# Disable fluentd and cron
+common_services:
+  fluentd:
+    container_name: fluentd
+    enabled: False
+    image: "{{ fluentd_image_full }}"
+    environment:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    volumes: "{{ fluentd_default_volumes + fluentd_extra_volumes }}"
+    dimensions: "{{ fluentd_dimensions }}"
+  kolla-toolbox:
+    container_name: kolla_toolbox
+    group: kolla-toolbox
+    enabled: True
+    image: "{{ kolla_toolbox_image_full }}"
+    environment:
+      ANSIBLE_NOCOLOR: "1"
+      ANSIBLE_LIBRARY: "/usr/share/ansible"
+    privileged: True
+    volumes: "{{ kolla_toolbox_default_volumes + kolla_toolbox_extra_volumes }}"
+    dimensions: "{{ kolla_toolbox_dimensions }}"
+  # DUMMY_ENVIRONMENT is needed because empty environment is not supported
+  cron:
+    container_name: cron
+    enabled: False
+    image: "{{ cron_image_full }}"
+    environment:
+      DUMMY_ENVIRONMENT: kolla_useless_env
+    volumes: "{{ cron_default_volumes + cron_extra_volumes }}"
+    dimensions: "{{ cron_dimensions }}"
+
+##########################
+# rabbitmq extra options #
+##########################
+rabbitmq_remove_ha_all_policy: true
+rabbitmq_cluster_partition_handling: "ignore"
+rabbitmq_server_additional_erl_args: "+sbwt none"
+rabbitmq_pcs_control_port: 3122

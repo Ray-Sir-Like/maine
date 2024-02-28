@@ -1,0 +1,18 @@
+[DEFAULT]
+debug = {{ kunkka_logging_debug }}
+host = {{ api_interface_address }}
+port = {{ kunkka_message_port }}
+log_dir = {{ kunkka_log_dir }}
+
+[mq]
+url = {{ notify_transport_url }}
+heartbeat = 60
+source_exchanges = {{ kunkka_enabled_notification_topics | map(attribute='name') | join(',') }}
+reconnect_timeout = 1000
+max_timeout_limit = 120000
+exchange_durable = false
+protocol = amqp
+{% if om_enable_rabbitmq_tls | bool %}
+ssl = true
+ssl_ca_file = {{ om_rabbitmq_cacert }}
+{% endif %}

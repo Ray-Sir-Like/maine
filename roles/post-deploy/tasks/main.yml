@@ -1,0 +1,107 @@
+---
+- name: Include OS-specific variables
+  tags: always
+  include_vars: "{{ distro_os }}"
+  with_first_found:
+    - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
+    - "{{ ansible_distribution }}.{{ ansible_architecture }}.yml"
+    - "{{ ansible_distribution }}.yml"
+    - "{{ ansible_os_family }}.yml"
+    - "default.yml"
+  loop_control:
+    loop_var: distro_os
+
+- name: Obtain the python version
+  tags: always
+  shell: python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])' || python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])'
+  register: cmd_python_version
+  changed_when: false
+
+- name: Set python version variables
+  tags: always
+  set_fact:
+    python_path: "{{ cmd_python_version.stdout }}"
+
+- include_tasks: ceph.yml
+  tags:
+    - ceph
+
+- include_tasks: ironic.yml
+  tags:
+    - ironic
+  when:
+    - enable_ironic | bool
+
+- include_tasks: mistral.yml
+  tags:
+    - mistral
+  when:
+    - enable_mistral | bool
+
+- include_tasks: manila.yml
+  tags:
+    - manila
+  when:
+    - enable_manila | bool
+
+- include_tasks: octavia.yml
+  tags:
+    - octavia
+  when:
+    - enable_octavia | bool
+
+- include_tasks: rally.yml
+  tags:
+    - rally
+  when:
+    - enable_rally | bool
+
+- include_tasks: cloudkitty.yml
+  tags:
+    - cloudkitty
+  when:
+    - enable_cloudkitty | bool
+
+- include_tasks: masakari.yml
+  tags:
+    - masakari
+  when:
+    - enable_masakari | bool
+
+- include_tasks: barbican.yml
+  tags:
+    - barbican
+  when:
+    - enable_barbican | bool
+
+- include_tasks: designate.yml
+  tags:
+    - designate
+  when:
+    - enable_designate | bool
+
+- include_tasks: senlin.yml
+  tags:
+    - senlin
+  when:
+    - enable_senlin | bool
+
+- include_tasks: zaqar.yml
+  tags:
+    - zaqar
+  when:
+    - enable_zaqar | bool
+
+- include_tasks: heat.yml
+  tags:
+    - heat
+  when:
+    - enable_heat | bool
+
+- include_tasks: hacker_fixes.yml
+  tags:
+    - fix
+
+- include_tasks: docs.yml
+  tags:
+    - docs

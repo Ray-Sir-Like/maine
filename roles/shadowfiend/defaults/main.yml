@@ -1,0 +1,123 @@
+---
+project_name: "shadowfiend"
+
+shadowfiend_services:
+  shadowfiend-api:
+    container_name: shadowfiend_api
+    group: shadowfiend-api
+    enabled: true
+    image: "{{ shadowfiend_api_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/shadowfiend-api/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ shadowfiend_api_dimensions }}"
+    healthcheck: "{{ shadowfiend_api_healthcheck }}"
+    environment:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    haproxy:
+      shadowfiend_api:
+        enabled: "{{ enable_shadowfiend }}"
+        mode: "http"
+        external: false
+        port: "{{ shadowfiend_api_port }}"
+        listen_port: "{{ shadowfiend_api_listen_port }}"
+      shadowfiend_api_external:
+        enabled: "{{ enable_shadowfiend }}"
+        mode: "http"
+        external: true
+        port: "{{ shadowfiend_api_port }}"
+        listen_port: "{{ shadowfiend_api_listen_port }}"
+  shadowfiend-processor:
+    container_name: shadowfiend_processor
+    group: shadowfiend-processor
+    enabled: true
+    image: "{{ shadowfiend_processor_image_full }}"
+    volumes:
+      - "{{ node_config_directory }}/shadowfiend-processor/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "kolla_logs:/var/log/kolla/"
+    dimensions: "{{ shadowfiend_processor_dimensions }}"
+    healthcheck: "{{ shadowfiend_processor_healthcheck }}"
+    environment:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+
+####################
+# OpenStack
+####################
+shadowfiend_admin_endpoint: "{{ admin_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ shadowfiend_api_port }}"
+shadowfiend_internal_endpoint: "{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ shadowfiend_api_port }}"
+shadowfiend_public_endpoint: "{{ public_protocol }}://{{ kolla_external_fqdn | put_address_in_context('url') }}:{{ shadowfiend_api_port }}"
+
+shadowfiend_logging_debug: "{{ openstack_logging_debug }}"
+
+shadowfiend_keystone_user: "shadowfiend"
+openstack_shadowfiend_auth: "{{ openstack_auth }}"
+
+####################
+# Docker
+####################
+shadowfiend_install_type: "{{ kolla_install_type }}"
+shadowfiend_tag: "{{ openstack_tag }}"
+
+shadowfiend_api_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/shadowfiend-api"
+shadowfiend_api_tag: "{{ shadowfiend_tag }}"
+shadowfiend_api_image_full: "{{ shadowfiend_api_image }}:{{ shadowfiend_api_tag }}"
+
+shadowfiend_processor_image: "{{ docker_registry ~ '/' if docker_registry else '' }}{{ docker_namespace }}/shadowfiend-processor"
+shadowfiend_processor_tag: "{{ shadowfiend_tag }}"
+shadowfiend_processor_image_full: "{{ shadowfiend_processor_image }}:{{ shadowfiend_processor_tag }}"
+
+shadowfiend_processor_dimensions: "{{ default_container_dimensions }}"
+shadowfiend_api_dimensions: "{{ default_container_dimensions }}"
+
+shadowfiend_api_enable_healthchecks: "{{ enable_container_healthchecks }}"
+shadowfiend_api_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+shadowfiend_api_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+shadowfiend_api_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+shadowfiend_api_healthcheck_test: ["CMD-SHELL", "healthcheck_curl http://{{ api_interface_address |  put_address_in_context('url') }}:{{ shadowfiend_api_port }} "]
+shadowfiend_api_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+shadowfiend_api_healthcheck:
+  interval: "{{ shadowfiend_api_healthcheck_interval }}"
+  retries: "{{ shadowfiend_api_healthcheck_retries }}"
+  start_period: "{{ shadowfiend_api_healthcheck_start_period }}"
+  test: "{% if shadowfiend_api_enable_healthchecks | bool %}{{ shadowfiend_api_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ shadowfiend_api_healthcheck_timeout }}"
+
+shadowfiend_processor_enable_healthchecks: "{{ enable_container_healthchecks }}"
+shadowfiend_processor_healthcheck_interval: "{{ default_container_healthcheck_interval }}"
+shadowfiend_processor_healthcheck_retries: "{{ default_container_healthcheck_retries }}"
+shadowfiend_processor_healthcheck_start_period: "{{ default_container_healthcheck_start_period }}"
+shadowfiend_processor_healthcheck_test: ["CMD-SHELL", "healthcheck_filemod /var/log/kolla/shadowfiend/shadowfiend-processor.log 4800"]
+shadowfiend_processor_healthcheck_timeout: "{{ default_container_healthcheck_timeout }}"
+shadowfiend_processor_healthcheck:
+  interval: "{{ shadowfiend_processor_healthcheck_interval }}"
+  retries: "{{ shadowfiend_processor_healthcheck_retries }}"
+  start_period: "{{ shadowfiend_processor_healthcheck_start_period }}"
+  test: "{% if shadowfiend_processor_enable_healthchecks | bool %}{{ shadowfiend_processor_healthcheck_test }}{% else %}NONE{% endif %}"
+  timeout: "{{ shadowfiend_processor_healthcheck_timeout }}"
+
+####################
+# Database
+####################
+shadowfiend_database_name: "shadowfiend"
+shadowfiend_database_user: "{% if use_preconfigured_databases | bool and use_common_mariadb_user | bool %}{{ database_user }}{% else %}shadowfiend{% endif %}"
+shadowfiend_database_address: "{{ database_address }}:{{ database_port }}"
+
+####################
+# Keystone
+####################
+shadowfiend_ks_services:
+  - name: "shadowfiend"
+    type: "trading"
+    description: "Shadowfiend Trading Service"
+    endpoints:
+      - {'interface': 'admin', 'url': '{{ shadowfiend_admin_endpoint }}'}
+      - {'interface': 'internal', 'url': '{{ shadowfiend_internal_endpoint }}'}
+      - {'interface': 'public', 'url': '{{ shadowfiend_public_endpoint }}'}
+
+shadowfiend_ks_users:
+  - project: "service"
+    user: "{{ shadowfiend_keystone_user }}"
+    password: "{{ shadowfiend_keystone_password }}"
+    role: "admin"

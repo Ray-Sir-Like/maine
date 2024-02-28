@@ -1,0 +1,24 @@
+---
+- name: Running neutron_uplugin_agent bootstrap container
+  vars:
+    neutron_uplugin_agent: "{{ uplugin_services['neutron-uplugin-agent'] }}"
+  become: true
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    detach: False
+    environment:
+      KOLLA_BOOTSTRAP:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    image: "{{ neutron_uplugin_agent.image }}"
+    labels:
+      BOOTSTRAP:
+    name: "bootstrap_uplugin"
+    restart_policy: "no"
+    volumes: "{{ neutron_uplugin_agent.volumes }}"
+  when:
+    - enable_neutron_uplugin_agent | bool
+    - neutron_uplugin_agent.enabled | bool
+    - neutron_uplugin_agent.host_in_groups | bool
+  run_once: True
+  delegate_to: "{{ groups[neutron_uplugin_agent.group][0] }}"

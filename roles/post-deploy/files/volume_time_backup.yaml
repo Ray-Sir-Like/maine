@@ -1,0 +1,54 @@
+---
+version: '2.0'
+
+volume_time_backup:
+  type: direct
+  description: |
+      This workflow creates a backup of a volume.
+  input:
+    - volume
+    - pattern: "{0}_time_snapshot_{1}"
+    - zaqar_queue_name: ""
+    - send_on_success: false
+    - send_on_error: false
+    - max_backups: 5
+    - action_region: "RegionOne"
+
+  tasks:
+    volume_backup:
+      action: mistral_plugin.volume_backups_create
+      input:
+        volume_id: <% $.volume %>
+        force: true
+        max_backups: <% int($.max_backups) %>
+        action_region: <% $.action_region %>
+
+      publish:
+        v_backup_id: <% task(volume_backup).result.id %>
+
+      on-success:
+        - success_task: <% $.send_on_success %>
+      on-error:
+        - error_task: <% $.send_on_error %>
+
+    success_task:
+      description: 'Feedback the successful results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Volume backup for volume <% $.volume %> has been created"
+            backup_id: <% $.v_backup_id %>
+            status: "successed"
+
+    error_task:
+      description: 'Feedback the failed results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Volume backup for volume <% $.volume %> has failed."
+            backup_id: <% $.v_backup_id %>
+            status: "failed"

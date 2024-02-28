@@ -1,0 +1,20 @@
+---
+- name: Running Shadowfiends bootstrap container
+  vars:
+    shadowfiend_api: "{{ shadowfiend_services['shadowfiend-api'] }}"
+  become: true
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    detach: False
+    environment:
+      KOLLA_BOOTSTRAP:
+      KOLLA_CONFIG_STRATEGY: "{{ config_strategy }}"
+    image: "{{ shadowfiend_api.image }}"
+    labels:
+      BOOTSTRAP:
+    name: "bootstrap_shadowfiend"
+    restart_policy: "no"
+    volumes: "{{ shadowfiend_api.volumes|reject('equalto', '')|list }}"
+  run_once: True
+  delegate_to: "{{ groups[shadowfiend_api.group][0] }}"

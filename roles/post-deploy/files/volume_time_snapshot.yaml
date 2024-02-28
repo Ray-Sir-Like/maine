@@ -1,0 +1,54 @@
+---
+version: '2.0'
+
+volume_time_snapshot:
+  type: direct
+  description: |
+      This workflow creates a snapshot of a volume.
+  input:
+    - volume
+    - pattern: "{0}_time_snapshot_{1}"
+    - zaqar_queue_name: ""
+    - send_on_success: false
+    - send_on_error: false
+    - max_snapshots: 5
+    - action_region: "RegionOne"
+
+  tasks:
+    volume_snapshot:
+      action: mistral_plugin.volume_snapshots_create
+      input:
+        volume_id: <% $.volume %>
+        force: true
+        max_snapshots: <% int($.max_snapshots) %>
+        action_region: <% $.action_region %>
+
+      publish:
+        v_snap_id: <% task(volume_snapshot).result.id %>
+
+      on-success:
+        - success_task: <% $.send_on_success %>
+      on-error:
+        - error_task: <% $.send_on_error %>
+
+    success_task:
+      description: 'Feedback the successful results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Snapshot for volume <% $.volume %> has been created"
+            snapshot_id: <% $.v_snap_id %>
+            status: "successed"
+
+    error_task:
+      description: 'Feedback the failed results'
+      action: zaqar.queue_post
+      input:
+        queue_name: <% $.zaqar_queue_name %>
+        messages:
+          body:
+            message: "Failed to create a snapshot for volume <% $.volume %>"
+            snapshot_id: <% $.v_snap_id %>
+            status: "failed"

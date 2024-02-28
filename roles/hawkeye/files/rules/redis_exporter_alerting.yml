@@ -1,0 +1,59 @@
+---
+groups:
+# Redis Status
+- name: redis_status
+  rules:
+  - alert: redis_has_been_exit
+    expr: redis_up != 1
+    labels:
+      severity: major
+      service: redis
+    annotations:
+      description: "redis服务状态：down"
+
+- name: redis_memory_usage
+  rules:
+  - alert: redis_memory_used_peak_more_than_10
+    expr: redis_memory_used_peak_bytes/1.073742e9 > 10
+    labels:
+      severity: warning
+      service: redis
+    annotations:
+      description: "内存峰值超过 10 GB，当前值：{{ $value }} GB"
+
+- name: network_iops
+  rules:
+  - alert: redis_instantaneous_input_more_than_10G
+    expr: redis_instantaneous_input_kbps/8.589935e9 > 10
+    labels:
+      severity: major
+      service: redis
+    annotations:
+      description: "Redis服务每秒读取速率高于 10 GB/s，当前值：{{ $value }} GB/s"
+
+- name: RedisAlerts
+  rules:
+    - alert: RedisMissingMaster
+      expr: (count(redis_instance_info{role="master"}) or vector(0)) < 1
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Redis missing master (instance {{ $labels.instance }})
+        description: "Redis cluster has no node marked as master.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+    - alert: RedisClusterFlapping
+      expr: changes(redis_connected_slaves[1m]) > 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: Redis cluster flapping (instance {{ $labels.instance }})
+        description: "Changes have been detected in Redis replica connection. This can occur when replica nodes lose connection to the master and reconnect (a.k.a flapping).\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+    - alert: RedisOutOfSystemMemory
+      expr: redis_memory_used_bytes / redis_total_system_memory_bytes * 100 > 90
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: Redis out of system memory (instance {{ $labels.instance }})
+        description: "Redis is running out of system memory (> 90%)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

@@ -1,0 +1,7 @@
+---
+- name: creates open-cas volumes for ssd cache devices and hdd devices.
+  become: true
+  hosts: ceph-ssd-cache-nodes
+  roles:
+    - { role: open-cas,
+        tags: open-cas }

@@ -1,0 +1,86 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Install basic OpenStack clients
+  hosts:
+    - control
+    - ci
+  gather_facts: false
+  become: true
+  tags: always
+  tasks:
+    - setup:
+
+    - name: Ensure python openstackclient
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - python3-openstackclient
+        - python3-osc-placement
+        - python3-glanceclient
+        - bash-completion
+      when:
+        - ansible_os_family == 'RedHat'
+
+    - name: Ensure python-openstackclient for Uniontech OS Server
+      package:
+        name: "{{ item }}"
+        state: present
+        loop:
+          - python-openstackclient
+          - bash-completion
+      when:
+        - ansible_distribution.split(' ')[0] == 'Uniontech'
+
+    - name: Creating admin openrc file on the deploy and control node
+      template:
+        src: "/usr/share/maine-ansible/roles/maine-common/templates/admin-openrc.sh.j2"
+        dest: "/root/admin-openrc"
+        mode: "0755"
+
+- name: Run certificates distribution
+  hosts:
+    - control
+  gather_facts: false
+  become: true
+  tags: always
+  tasks:
+    - setup:
+
+    - name: Copy certificates to control nodes
+      copy:
+        src: "{{ node_config }}/certificates"
+        dest: "{{ node_config }}/"
+      when:
+        - (kolla_enable_tls_external | bool) or (kolla_enable_tls_internal | bool)
+
+- import_playbook: configure-chrony-ha.yml
+  vars:
+    enable_chrony_ha: True
+
+- import_playbook: maine_backup.yml
+
+- import_playbook: cron.yml
+
+- name: Apply role post-deploy
+  vars:
+    kolla_action: deploy
+  hosts:
+    - control
+    - haproxy
+  gather_facts: no
+  roles:
+    - role: post-deploy
+
+- name: Add bash completion for OpenStack clients
+  hosts:
+    - control
+  gather_facts: no
+  become: true
+  tags: always
+  tasks:
+    - shell: openstack complete | sudo tee /etc/bash_completion.d/osc.bash_completion > /dev/null
+      when:
+        - ansible_os_family == 'RedHat'
+      changed_when: False

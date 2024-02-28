@@ -1,0 +1,99 @@
+---
+- import_playbook: /usr/share/kolla-ansible/ansible/gather-facts.yml
+
+- name: Apply role common
+  gather_facts: false
+  hosts:
+    - cron
+    - kolla-logs
+    - kolla-toolbox
+  serial: '{{ kolla_serial|default("0") }}'
+  tags:
+    - common
+  roles:
+    - role: common
+
+- name: Apply role openvswitch
+  gather_facts: false
+  hosts:
+    - openvswitch
+  serial: '{{ kolla_serial|default("0") }}'
+  roles:
+    - { role: openvswitch,
+        tags: openvswitch,
+        when: "(enable_openvswitch | bool) and not (enable_ovs_dpdk | bool)"}
+
+- name: Apply role network
+  hosts: baremetal
+  gather_facts: false
+  tasks:
+    - name: Remove default ifcfg-eth0
+      file:
+        path: /etc/sysconfig/network-scripts/ifcfg-eth0
+        state: absent
+      changed_when: False
+      when:
+        - '"eth0" not in ansible_interfaces'
+        - ansible_distribution.split(' ')[0] != 'Uniontech'
+      tags: network
+
+    - name: Apply network configuration
+      kolla_toolbox:
+        module_name: uos_net_config
+        module_args:
+          network_config: "{{ network_config | to_json }}"
+          cleanup: "{{ (cleanup|default(False)) | bool }}"
+          exit_on_validation_errors: true
+          verbose: true
+        user: root
+      when: ansible_distribution.split(' ')[0] != 'Uniontech'
+      tags: network
+
+    - name: Apply network configuration for Uniontech OS Server
+      vars:
+        source_dir: "/usr/share/maine-ansible/config"
+      template:
+        src: "{{ item }}"
+        dest: "/etc/network/interfaces"
+        mode: "0644"
+      with_first_found:
+        - "{{ node_config_directory }}/uos-network.conf"
+        - "{{ source_dir }}/uos-network.conf"
+      when: ansible_distribution.split(' ')[0] == 'Uniontech'
+      tags: network
+
+    - name: Restart network service
+      vars:
+        restart_network: "{{ (restart|default(True)) | bool }}"
+      service:
+        name: network
+        state: restarted
+      tags: network
+      when:
+        - restart_network
+        - ansible_distribution.split(' ')[0] != 'Uniontech'
+
+    - name: Restart network service for Uniontech OS Server
+      vars:
+        restart_network: "{{ (restart|default(True)) | bool }}"
+      service:
+        name: networking
+        state: restarted
+      tags: network
+      when:
+        - restart_network
+        - ansible_distribution.split(' ')[0] == 'Uniontech'
+
+    - name: Add ovs bridge for Uniontech OS Server
+      shell: |
+        ovs-vsctl add-br {{ neutron_bridge_name }}
+        ovs-vsctl add-port {{ neutron_bridge_name }} {{ bond_name }}
+      when: ansible_distribution.split(' ')[0] == 'Uniontech'
+
+
+- name: Apply role network_check
+  hosts: baremetal
+  gather_facts: no
+  roles:
+    - role: network-check
+      tags: network-check

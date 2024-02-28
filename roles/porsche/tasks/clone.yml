@@ -1,0 +1,7 @@
+---
+- name: Cloning porsche source repository for development
+  git:
+    repo: "{{ porsche_git_repository }}"
+    dest: "{{ kolla_dev_repos_directory }}/{{ project_name }}"
+    update: "{{ porsche_dev_repos_pull }}"
+    version: "{{ porsche_source_version }}"

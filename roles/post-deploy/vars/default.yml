@@ -1,0 +1,12 @@
+---
+barbicanclient: python3-barbicanclient
+cloudkittyclient: python3-cloudkittyclient
+designateclient: python3-designateclient
+ironicclient: python3-ironicclient
+ironic_inspectorclient: python3-ironic-inspector-client
+manilaclient: python3-manilaclient
+masakariclient: python3-masakariclient
+mistralclient: python3-mistralclient
+octaviaclient: python3-octaviaclient
+senlinclient: python3-senlinclient
+zaqarclient: python3-zaqarclient

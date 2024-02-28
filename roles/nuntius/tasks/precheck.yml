@@ -1,0 +1,84 @@
+---
+- name: Get container facts
+  kolla_container_facts:
+    name:
+      - nuntius
+  register: container_facts
+
+- name: Checking free port for nuntius
+  wait_for:
+    host: "{{ api_interface_address }}"
+    port: "{{ nuntius_port }}"
+    connect_timeout: 1
+    timeout: 1
+    state: stopped
+  when:
+    - container_facts['nuntius'] is not defined
+    - inventory_hostname in groups['nuntius']
+
+- name: Nuntius configuration sanity check
+  block:
+    - name: Nuntius check for telegram configuration
+      fail:
+        msg: "telegram is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_telegram | bool and
+        (nuntius_telegram_token is not defined or nuntius_telegram_userid is not defined)
+
+    - name: Nuntius check for dingtalk configuration
+      fail:
+        msg: "dingtalk is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_dingtalk | bool and
+        (nuntius_dingtalk_token is not defined or
+        nuntius_dingtalk_phone_numbers is not defined or
+        nuntius_dingtalk_isatall is not defined)
+
+    - name: Nuntius check for hl95 configuration
+      fail:
+        msg: "hl95 is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_hl95 | bool and
+        (nuntius_hl95_username is not defined or
+        nuntius_hl95_password is not defined or
+        nuntius_hl95_epid is not defined or
+        nuntius_hl95_title is not defined or
+        nuntius_hl95_phone_numbers is not defined)
+
+    - name: Nuntius check for aliyun configuration
+      fail:
+        msg: "aliyun is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_aliyun | bool and
+        (nuntius_aliyun_region_id is not defined or
+        nuntius_aliyun_access_key is not defined or
+        nuntius_aliyun_access_key_secret is not defined or
+        nuntius_aliyun_sign_name is not defined or
+        nuntius_aliyun_template_code is not defined or
+        nuntius_aliyun_template_param_key is not defined)
+
+    - name: Nuntius check for Rsyslog configuration
+      fail:
+        msg: "Rsyslog is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_rsyslog | bool and
+        (nuntius_rsyslog_address is not defined or
+        nuntius_rsyslog_appname is not defined or
+        nuntius_rsyslog_protocol is not defined)
+
+    - name: Nuntius check for Email configuration
+      fail:
+        msg: "Email is enabled, but mandatory vars
+          are not configured in `/etc/maine/globals.yml`"
+      when: >
+        enable_nuntius_email | bool and
+        (nuntius_email_smtpserver is not defined or
+        nuntius_email_smtpuser is not defined or
+        nuntius_email_smtppwd is not defined or
+        nuntius_email_sender is not defined or
+        nuntius_email_insecureskipverify is not defined)

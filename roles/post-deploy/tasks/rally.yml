@@ -1,0 +1,54 @@
+---
+# use rally log volume to pass amphora ssh keyfile to rally container
+- name: Copy octavia amphora ssh private key to rally log dir
+  copy:
+    content: "{{ octavia_ssh_key.private_key }}"
+    dest: "/var/log/kolla/rally/octavia_ssh_key"
+    mode: 0600
+    owner: 42440
+    group: 42440
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['rally'] }}"
+  tags:
+    - rally
+  when:
+    - enable_octavia | bool
+
+- name: Copy extra-options to rally log dir
+  template:
+    dest: "/var/log/kolla/rally/extra-options.txt"
+    src: rally-extra-options.j2
+    mode: 0644
+    owner: 42440
+    group: 42440
+  changed_when: False
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['rally'] }}"
+  tags:
+    - rally
+
+- name: Copy skip-list to rally log dir
+  template:
+    dest: "/var/log/kolla/rally/skip-list.yaml"
+    src: rally-skip-list.yaml.j2
+    mode: 0644
+    owner: 42440
+    group: 42440
+  changed_when: False
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['rally'] }}"
+  tags:
+    - rally
+
+- name: Copy run script to rally log dir
+  template:
+    dest: "/var/log/kolla/rally/run.sh"
+    src: run.sh.j2
+    mode: 0755
+    owner: 42440
+    group: 42440
+  changed_when: False
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['rally'] }}"
+  tags:
+    - rally

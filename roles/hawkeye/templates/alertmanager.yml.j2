@@ -1,0 +1,144 @@
+route:
+  receiver: 'email'
+  group_by: ['alertname', 'region', 'job']
+  group_wait: 30s
+  repeat_interval: {{ hawkeye_alarm_repeat_interval | default('30m') }}
+  routes:
+{% if enable_hawkeye_alertmanager_email | bool %}
+    - receiver: 'email'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_hawkeye_alertmanager_wechat | bool %}
+    - receiver: 'wechat'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_nuntius_telegram | bool %}
+    - receiver: 'telegram'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_nuntius_dingtalk | bool %}
+    - receiver: 'dingtalk'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_nuntius_hl95 | bool or enable_nuntius_yunpian | bool %}
+    - receiver: 'sms_alert'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_nuntius_rsyslog | bool %}
+    - receiver: 'rsyslog'
+      group_by: ['...']
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+{% if enable_nuntius_activemq | bool %}
+    - receiver: 'activemq'
+      match_re:
+        severity: warning|critical|major
+      continue: true
+{% endif %}
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'major'
+    equal: ['alertname', 'region', 'job']
+
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'region', 'job']
+
+  - source_match:
+      severity: 'major'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'region', 'job']
+
+receivers:
+    - name: 'email'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% if enable_hawkeye_alertmanager_wechat | bool %}
+    - name: 'wechat'
+      wechat_configs:
+        - send_resolved: true
+          to_party: '{{ wechat_to_party | join('|') }}'
+          agent_id: '{{ wechat_agent_id }}'
+          corp_id: '{{ wechat_corp_id }}'
+          api_url: '{{ wechat_api_url }}'
+          api_secret: '{{ wechat_api_secret }}'
+{% endif %}
+{% if enable_nuntius_telegram | bool %}
+    - name: 'telegram'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% endif %}
+{% if enable_nuntius_dingtalk | bool %}
+    - name: 'dingtalk'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% endif %}
+{% if enable_nuntius_hl95 | bool or enable_nuntius_yunpian | bool %}
+    - name: 'sms_alert'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% endif %}
+{% if enable_nuntius_rsyslog | bool %}
+    - name: 'rsyslog'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% endif %}
+{% if enable_nuntius_activemq | bool %}
+    - name: 'activemq'
+      webhook_configs:
+        - url: '{{ internal_protocol }}://{{ kolla_internal_fqdn | put_address_in_context('url') }}:{{ nuntius_port }}/alert'
+{% if kolla_enable_tls_internal|bool %}
+          http_config:
+            tls_config:
+              insecure_skip_verify: true
+{% endif %}
+          send_resolved: true
+{% endif %}

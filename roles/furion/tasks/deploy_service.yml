@@ -1,0 +1,25 @@
+---
+- name: Create furion systemd files
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  with_items:
+    - furion-agent.service
+    - furion-server.service
+  become: True
+
+- name: Reload systemd service
+  become: True
+  systemd:
+    daemon_reload: true
+
+- name: Start and enable docker
+  service:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  with_items:
+    - furion-agent
+    - furion-server
+  become: True

@@ -1,0 +1,48 @@
+---
+network_config:
+  - type: interface
+    mtu: "{{ pxe_mtu }}"
+    name: eth1
+    addresses:
+      - ip_netmask: "{{ pxe_address }}/24"
+  - type: ovs_bridge
+    name: br-ex
+    mtu: "{{ service_mtu }}"
+    members:
+      - type: interface
+        name: eth2
+        mtu: "{{ service_mtu }}"
+      - type: vlan
+        vlan_id: 2003
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2003 }}/24"
+      - type: vlan
+        vlan_id: 2004
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2004 }}/24"
+      - type: vlan
+        vlan_id: 2005
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2005 }}/24"
+      - type: vlan
+        vlan_id: 2006
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2006 }}/24"
+        routes:
+          - ip_netmask: 0.0.0.0/0
+            next_hop: "{{ gateway }}"
+            default: true
+      - type: vlan
+        vlan_id: 2007
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2007 }}/24"
+      - type: vlan
+        vlan_id: 2009
+        mtu: "{{ service_mtu }}"
+        addresses:
+          - ip_netmask: "{{ vlan2009 }}/24"

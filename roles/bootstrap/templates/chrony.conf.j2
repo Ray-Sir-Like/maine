@@ -1,0 +1,46 @@
+{% set keyfile = '/etc/chrony.keys' %}
+
+server {{ seed_interface_address }} iburst
+{# NOTE(jeffrey4l): external_ntp_servers may be None here #}
+{% if external_ntp_servers %}
+{% for ntp_server in external_ntp_servers %}
+server {{ ntp_server }} iburst
+{% endfor %}
+{% endif %}
+
+user chrony
+
+keyfile {{ keyfile }}
+
+commandkey 1
+
+driftfile /var/lib/chrony/chrony.drift
+
+log tracking measurements statistics
+logdir /var/log/chrony
+
+makestep 3 3
+
+maxupdateskew 100.0
+
+dumponexit
+
+dumpdir /var/lib/chrony
+
+{% if inventory_hostname in groups['deployment'] %}
+allow all
+# prevent chrony sync from self
+deny {{ seed_interface_address }}
+local stratum 10
+
+bindaddress {{ seed_interface_address }}
+{% else %}
+port 0
+deny all
+{% endif %}
+
+logchange 0.5
+
+hwclockfile /etc/adjtime
+
+rtcsync
